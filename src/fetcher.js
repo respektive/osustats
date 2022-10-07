@@ -3,7 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import axios from "axios"
 
-async function fetchLeaderboardsV1() {
+async function fetchLeaderboardsV1(skip = 0) {
     const conn = await mariadb.createConnection({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
@@ -15,7 +15,7 @@ async function fetchLeaderboardsV1() {
     const beatmaps = beatmapsRes.data
     const beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
 
-    for (const [idx, beatmap_id] of beatmapIds.entries()) {
+    for (const [idx, beatmap_id] of beatmapIds.slice(skip).entries()) {
 
         const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=100`)
         const beatmapScores = response.data
@@ -49,7 +49,7 @@ async function fetchLeaderboardsV1() {
         }
         await conn.query("DELETE FROM scores WHERE beatmap_id = ?", [beatmap_id])
         const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
-        console.log(`[${idx}/${beatmapIds.length}]`, "added", res.affectedRows, "scores for beatmap_id", beatmap_id)
+        console.log(`[${idx}/${beatmapIds.slice(skip).length}]`, "added", res.affectedRows, "scores for beatmap_id", beatmap_id)
     }
 
     conn.end()
