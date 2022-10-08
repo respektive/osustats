@@ -8,6 +8,8 @@ import { insertIntoRedis } from "./redis.js"
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 
 async function fetchLeaderboardsV1(skip = 0) {
+    console.log("Starting Leaderboard fetching now.")
+
     const conn = await mariadb.createConnection({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
@@ -17,12 +19,15 @@ async function fetchLeaderboardsV1(skip = 0) {
 
     const beatmapsRes = await axios.get("https://osu.respektive.pw/beatmaps")
     const beatmaps = beatmapsRes.data
-    const beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
+    let beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
+    if (skip > 0) {
+        beatmapIds = beatmapIds.slice(skip)
+    }
 
     let scoresToInsert = []
     let beatmapsToClear = []
 
-    for (const [idx, beatmap_id] of beatmapIds.slice(skip).entries()) {
+    for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToClear.push(beatmap_id)
 
         try {
@@ -54,10 +59,10 @@ async function fetchLeaderboardsV1(skip = 0) {
                 ])
             }
 
-            if (scoresToInsert.length >= 2500 || idx + 1 == beatmapIds.slice(skip).length) {
+            if (scoresToInsert.length >= 2500 || idx + 1 == beatmapIds.length) {
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
-                console.log(new Date, `[${idx + 1}/${beatmapIds.slice(skip).length}]`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                console.log(new Date, `[${idx + 1}/${beatmapIds.length}]`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
             }

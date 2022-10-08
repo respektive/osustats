@@ -3,4 +3,6 @@ import { fetchLeaderboardsV1 } from "./fetcher.js"
 import "./api.js"
 
 // run every night at midnight.
-cron.schedule("0 0 * * *", fetchLeaderboardsV1)
+cron.schedule("0 0 * * *", () => {
+    fetchLeaderboardsV1()
+})
