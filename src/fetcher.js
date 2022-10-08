@@ -66,7 +66,8 @@ async function fetchLeaderboardsV1(skip = 0) {
                 scoresToInsert = []
                 beatmapsToClear = []
             }
-        } catch {
+        } catch (e) {
+            console.error(e)
             continue
         }
     }
