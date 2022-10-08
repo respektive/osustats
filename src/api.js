@@ -8,7 +8,7 @@ const port = process.env.PORT
 
 app.get("/rankings/:type", async (req, res) => {
     const type = req.params.type ?? "top50s"
-    const limit = req.query.limit ?? -1
+    const limit = req.query.limit ?? 50
     const offset = req.query.offset ?? 0
     const rankings = await getRankings(type, limit, offset)
 

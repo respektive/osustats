@@ -20,6 +20,7 @@ async function insertIntoRedis() {
     })
 
     const rows = await conn.query(QUERY)
+    console.log("MariaDB Row Count:", rows.length)
 
     for (const row of rows) {
         redis.zadd("top50s", parseInt(row.top50s), row.user_id)
