@@ -3,6 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import axios from "axios"
 import axiosRetry from 'axios-retry';
+import { insertIntoRedis } from "./redis.js"
 
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
 
@@ -65,6 +66,7 @@ async function fetchLeaderboardsV1(skip = 0) {
         }
     }
 
+    await insertIntoRedis()
     console.log("done.")
     conn.end()
 }
