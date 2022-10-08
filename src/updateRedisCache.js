@@ -1,3 +1,3 @@
 import { insertIntoRedis } from "./redis.js"
 
-insertIntoRedis()
+insertIntoRedis(true)

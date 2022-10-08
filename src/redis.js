@@ -4,14 +4,9 @@ import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
 
-const QUERY = `SELECT user_id, username,
-SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) AS top1s,
-SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) AS top8s,
-SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) AS top25s,
-SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) AS top50s
-FROM scores GROUP BY user_id ORDER BY top50s DESC`
+const COUNTS = [1, 8, 25, 50]
 
-async function insertIntoRedis() {
+async function insertIntoRedis(clear = false) {
     const conn = await mariadb.createConnection({
         host: process.env.DB_HOST,
         user: process.env.DB_USER,
@@ -19,15 +14,21 @@ async function insertIntoRedis() {
         database: process.env.DB_DATABASE
     })
 
-    const rows = await conn.query(QUERY)
-    console.log("MariaDB Row Count:", rows.length)
+    for (const count of COUNTS) {
+        const type = `top${count}s`
 
-    for (const row of rows) {
-        redis.zadd("top50s", parseInt(row.top50s), row.user_id)
-        redis.zadd("top25s", parseInt(row.top25s), row.user_id)
-        redis.zadd("top8s", parseInt(row.top8s), row.user_id)
-        redis.zadd("top1s", parseInt(row.top1s), row.user_id)
-        redis.set(`user_${row.user_id}`, row.username)
+        const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
+        const rows = await conn.query(query)
+        console.log("MariaDB Row Count:", rows.length)
+
+        if (clear === true) {
+            await redis.del(type)
+        }
+
+        for (const row of rows) {
+            redis.zadd(type, parseInt(row[type]), row.user_id)
+            redis.set(`user_${row.user_id}`, row.username)
+        }
     }
 
     console.log("done.")
