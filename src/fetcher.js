@@ -15,12 +15,14 @@ async function fetchLeaderboardsV1(skip = 0) {
     const beatmaps = beatmapsRes.data
     const beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
 
+    let scoresToInsert = []
+    let beatmapsToClear = []
+
     for (const [idx, beatmap_id] of beatmapIds.slice(skip).entries()) {
+        beatmapsToClear.push(beatmap_id)
 
         const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=100`)
         const beatmapScores = response.data
-
-        let scoresToInsert = []
 
         for (const [index, score] of beatmapScores.entries()) {
             const position = index + 1
@@ -47,11 +49,17 @@ async function fetchLeaderboardsV1(skip = 0) {
                 score.user_id,
             ])
         }
-        await conn.query("DELETE FROM scores WHERE beatmap_id = ?", [beatmap_id])
-        const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
-        console.log(`[${idx}/${beatmapIds.slice(skip).length}]`, "added", res.affectedRows, "scores for beatmap_id", beatmap_id)
+
+        if (scoresToInsert.length >= 2500 || idx + 1 == beatmapIds.slice(skip).length) {
+            await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
+            const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
+            console.log(new Date, `[${idx + 1}/${beatmapIds.slice(skip).length}]`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+            scoresToInsert = []
+            beatmapsToClear = []
+        }
     }
 
+    console.log("done.")
     conn.end()
 }
 
