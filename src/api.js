@@ -1,10 +1,13 @@
 import * as dotenv from 'dotenv'
 dotenv.config()
 import express from "express"
+import logger from "morgan"
 import { getRankings, getCounts } from "./redis.js"
 
 const app = express()
 const port = process.env.PORT
+
+app.use(logger("dev"))
 
 app.get("/rankings/:type", async (req, res) => {
     const type = req.params.type ?? "top50s"
