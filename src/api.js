@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 import express from "express"
 import logger from "morgan"
-import { getRankings, getCounts } from "./redis.js"
+import { getRankings, getCounts, getLastUpdate } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
 
@@ -40,6 +40,13 @@ app.get('/counts/:user_id', async (req, res) => {
 
     res.status(200)
     res.json(counts)
+})
+
+app.get("/last_update", async (req, res) => {
+    const last_update = await getLastUpdate()
+
+    res.status(200)
+    res.json({ last_update })
 })
 
 app.get("/*", async (req, res) => {

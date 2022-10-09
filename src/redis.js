@@ -33,13 +33,15 @@ async function insertIntoRedis(clear = false) {
             if (!await redis.hget(row.user_id, "country")) {
                 const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
                 const user = res.data[0]
-                redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
+                await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
             } else {
-                redis.hset(row.user_id, { username: row.username })
+                await redis.hset(row.user_id, { username: row.username })
             }
-            redis.zadd(type, parseInt(row[type]), row.user_id)
+            await redis.zadd(type, parseInt(row[type]), row.user_id)
         }
     }
+
+    await redis.set("last_update", new Date().toISOString())
 
     console.log("done.")
     conn.end()
@@ -90,4 +92,12 @@ async function getCounts(user_id) {
     }
 }
 
-export { insertIntoRedis, getRankings, getCounts }
+async function getLastUpdate() {
+    try {
+        return await redis.get("last_update")
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
+export { insertIntoRedis, getRankings, getCounts, getLastUpdate }
