@@ -23,12 +23,13 @@ async function insertIntoRedis(clear = false) {
 
         const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
         const rows = await conn.query(query)
-        console.log(type, "MariaDB Row Count:", rows.length)
+        console.log(`[${new Date().toISOString()}]`, type + ":", "MariaDB Row Count:", rows.length)
 
         if (clear === true) {
             await redis.del(type)
         }
 
+        console.log(`[${new Date().toISOString()}]`, type + ":", "inserting into redis...")
         for (const row of rows) {
             if (!await redis.hget(row.user_id, "country")) {
                 const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
@@ -39,11 +40,12 @@ async function insertIntoRedis(clear = false) {
             }
             await redis.zadd(type, parseInt(row[type]), row.user_id)
         }
+        console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
     }
 
     await redis.set("last_update", new Date().toISOString())
 
-    console.log("done.")
+    console.log(`[${new Date().toISOString()}]`, "done updating.")
     conn.end()
 }
 
