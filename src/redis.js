@@ -51,7 +51,7 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
             limit = parseInt(limit) + parseInt(offset)
         }
 
-        const ranking = await redis.zrevrange(type, offset, limit, "WITHSCORES")
+        const ranking = await redis.zrevrange(type, offset, limit - 1, "WITHSCORES")
 
         const leaderboard = []
         for (let i = 0; i < ranking.length; i += 2) {
