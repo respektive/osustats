@@ -5,7 +5,7 @@ import axios from "axios"
 import axiosRetry from 'axios-retry';
 import { insertIntoRedis } from "./redis.js"
 
-axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay });
+axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 async function fetchLeaderboardsV1(skip = 0) {
     console.log("Starting Leaderboard fetching now.")
@@ -31,7 +31,7 @@ async function fetchLeaderboardsV1(skip = 0) {
         beatmapsToClear.push(beatmap_id)
 
         try {
-            const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=100`)
+            const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=50`)
             const beatmapScores = response.data
             for (const [index, score] of beatmapScores.entries()) {
                 const position = index + 1
@@ -59,7 +59,7 @@ async function fetchLeaderboardsV1(skip = 0) {
                 ])
             }
 
-            if (scoresToInsert.length >= 2500 || idx + 1 == beatmapIds.length) {
+            if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
                 console.log(new Date, `[${idx + 1}/${beatmapIds.length}]`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
