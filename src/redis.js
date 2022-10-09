@@ -79,10 +79,10 @@ async function getCounts(user_id) {
         data["user_id"] = parseInt(user_id)
         data["username"] = username
         data["country"] = country
-        data["top50s"] = parseInt(await redis.zscore("top50s", user_id))
-        data["top25s"] = parseInt(await redis.zscore("top25s", user_id))
-        data["top8s"] = parseInt(await redis.zscore("top8s", user_id))
-        data["top1s"] = parseInt(await redis.zscore("top1s", user_id))
+        data["top50s"] = parseInt(await redis.zscore("top50s", user_id)) ?? 0
+        data["top25s"] = parseInt(await redis.zscore("top25s", user_id)) ?? 0
+        data["top8s"] = parseInt(await redis.zscore("top8s", user_id)) ?? 0
+        data["top1s"] = parseInt(await redis.zscore("top1s", user_id)) ?? 0
 
         return data
     } catch (e) {
