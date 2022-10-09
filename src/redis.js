@@ -33,7 +33,7 @@ async function insertIntoRedis(clear = false) {
             if (!await redis.hget(row.user_id, "country")) {
                 const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
                 const user = res.data[0]
-                redis.hset(row.user_id, { username: row.username, country: user.country })
+                redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
             }
             redis.zadd(type, parseInt(row[type]), row.user_id)
         }
