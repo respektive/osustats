@@ -3,10 +3,16 @@ dotenv.config()
 import express from "express"
 import logger from "morgan"
 import { getRankings, getCounts } from "./redis.js"
+import path from "path"
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express()
 const port = process.env.PORT
 
+app.use(express.static(path.join(__dirname, "frontend", "build")))
 app.use(logger("dev"))
 
 app.get("/rankings/:type", async (req, res) => {
@@ -34,6 +40,10 @@ app.get('/counts/:user_id', async (req, res) => {
 
     res.status(200)
     res.json(counts)
+})
+
+app.get("/*", async (req, res) => {
+    res.sendFile(path.join(__dirname, "frontend", "build", "index.html"))
 })
 
 app.listen(port, () => {
