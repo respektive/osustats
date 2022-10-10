@@ -72,9 +72,9 @@ async function fetchLeaderboardsV1(skip = 0) {
         }
     }
 
-    await insertIntoRedis()
-    console.log("done.")
     conn.end()
+    console.log("done.")
+    await insertIntoRedis()
 }
 
 export { fetchLeaderboardsV1 }
