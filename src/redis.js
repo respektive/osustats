@@ -97,6 +97,35 @@ async function getCounts(user_id) {
     }
 }
 
+async function getCountsSQL(query, params) {
+    const conn = await mariadb.createConnection({
+        host: process.env.DB_HOST,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASSWORD,
+        database: process.env.DB_DATABASE
+    })
+
+    const rows = await conn.query(query, params)
+    conn.end()
+    const row = rows[0]
+
+    try {
+        let data = {}
+        const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
+        data["user_id"] = parseInt(row.user_id)
+        data["username"] = username
+        data["country"] = country
+        data["top50s"] = parseInt(row.top50s) ?? 0
+        data["top25s"] = parseInt(row.top25s) ?? 0
+        data["top8s"] = parseInt(row.top8s) ?? 0
+        data["top1s"] = parseInt(row.top1s) ?? 0
+
+        return data
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
 async function getLastUpdate() {
     try {
         return await redis.get("last_update")
@@ -105,4 +134,4 @@ async function getLastUpdate() {
     }
 }
 
-export { insertIntoRedis, getRankings, getCounts, getLastUpdate }
+export { insertIntoRedis, getRankings, getCounts, getCountsSQL, getLastUpdate }
