@@ -28,8 +28,9 @@ async function insertIntoRedis(clear = false) {
         if (clear === true) {
             await redis.del(type)
         }
-
-        console.log(`[${new Date().toISOString()}]`, type + ":", "inserting into redis...")
+        let total = rows.length
+        console.log(`[${new Date().toISOString()}]`, type + ":", `inserting ${total} users into redis...`)
+        let counter = 0
         for (const row of rows) {
             if (!await redis.hget(row.user_id, "country")) {
                 const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
@@ -39,6 +40,8 @@ async function insertIntoRedis(clear = false) {
                 await redis.hset(row.user_id, { username: row.username })
             }
             await redis.zadd(type, parseInt(row[type]), row.user_id)
+            counter += 1
+            console.log(`[${new Date().toISOString()}]`, `(${counter}/${total})`, row.user_id, row.username)
         }
         console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
     }
