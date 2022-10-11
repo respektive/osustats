@@ -61,6 +61,18 @@ app.get("/rankings/:type?", async (req, res) => {
         filtered = true
     }
 
+    if (req.query.spinners_min) {
+        filter += ` AND num_spinners >= ?`;
+        params.push(req.query.spinners_min);
+        filtered = true
+    }
+
+    if (req.query.spinners_max) {
+        filter += ` AND num_spinners < ?`;
+        params.push(req.query.spinners_max);
+        filtered = true
+    }
+
     if (req.query.star_rating) {
         let star_range = req.query.star_rating.split("-");
 
@@ -132,6 +144,16 @@ app.get('/counts/:user_id', async (req, res) => {
     if (req.query.length_max) {
         filter += ` AND total_length <= ?`;
         params.push(req.query.length_max);
+    }
+
+    if (req.query.spinners_min) {
+        filter += ` AND num_spinners >= ?`;
+        params.push(req.query.spinners_min);
+    }
+
+    if (req.query.spinners_max) {
+        filter += ` AND num_spinners < ?`;
+        params.push(req.query.spinners_max);
     }
 
     if (req.query.star_rating) {
