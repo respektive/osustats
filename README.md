@@ -3,6 +3,13 @@ API endpoints for osu! leaderboard position counts. https://osustats.respektive.
 
 __Still very WIP__
 
+### Running your own
+
+You will need some beatmap table to use the beatmap filters.
+For example: https://github.com/respektive/osu-beatmap-database/
+
+### Usage
+
 #### Rankings endpoints with optional parameters:
 ```
 https://osustats.respektive.pw/rankings/top50s?page=5
