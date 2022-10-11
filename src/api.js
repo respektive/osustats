@@ -21,7 +21,6 @@ app.get("/rankings/:type?", async (req, res) => {
     const type = req.params.type && TYPES.includes(req.params.type) ? req.params.type : "top50s"
     let limit = (parseInt(req.query.limit) <= 100 && parseInt(req.query.limit) > 0) ? req.query.limit : 50
     let offset = req.query.offset ?? 0
-    let filtered = false
     const pos = parseInt(type.replace(/\D/g, ""))
 
     if (req.query.page) {
@@ -34,13 +33,13 @@ app.get("/rankings/:type?", async (req, res) => {
     const query = `SELECT user_id, count(score_id) as ? FROM osustats.scores 
     WHERE position<= ? AND beatmap_id IN (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
-    let { filter, params } = getFilters(req.query, [type, pos])
+    let { filter, params, filtered } = getFilters(req.query, [type, pos])
 
     filter += `) GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
     params.push(parseInt(limit), parseInt(offset))
 
     let rankings
-    if (filter.length > 0) {
+    if (filtered) {
         rankings = await getRankingsSQL(type, `${query} ${filter}`, params, offset)
     } else {
         rankings = await getRankings(type, limit, offset)
@@ -92,6 +91,7 @@ app.listen(port, () => {
 })
 
 function getFilters(query, _params) {
+    let filtered = false
     let filter = ""
     let params = _params
     if (query.from) {
@@ -146,5 +146,8 @@ function getFilters(query, _params) {
         params.push('%' + tags + '%');
     }
 
-    return { filter, params }
+    if (filter.length > 0)
+        filtered = true
+
+    return { filter, params, filtered }
 }
