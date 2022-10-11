@@ -1,6 +1,8 @@
 import * as dotenv from 'dotenv'
 dotenv.config()
 import * as mariadb from "mariadb"
+import Redis from "ioredis"
+const redis = new Redis();
 import axios from "axios"
 import axiosRetry from 'axios-retry';
 import { insertIntoRedis } from "./redis.js"
@@ -78,6 +80,7 @@ async function fetchLeaderboardsV1(skip = 0) {
     conn.end()
     console.log("done.")
     await insertIntoRedis()
+    await redis.set("last_update", new Date().toISOString())
 }
 
 export { fetchLeaderboardsV1 }

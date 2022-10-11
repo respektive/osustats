@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TYPES = ["top50s", "top25s", "top8s", "top1s"]
+const TYPES = ["top50s", "top25s", "top15s", "top8s", "top1s"]
 
 const app = express()
 const port = process.env.PORT

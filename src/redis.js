@@ -8,7 +8,7 @@ import axios from "axios"
 import axiosRetry from 'axios-retry';
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
-const COUNTS = [1, 8, 25, 50]
+const COUNTS = [1, 8, 15, 25, 50]
 
 async function insertIntoRedis(clear = false) {
     const conn = await mariadb.createConnection({
@@ -45,8 +45,6 @@ async function insertIntoRedis(clear = false) {
         }
         console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
     }
-
-    await redis.set("last_update", new Date().toISOString())
 
     console.log(`[${new Date().toISOString()}]`, "done updating.")
     conn.end()
@@ -99,7 +97,7 @@ async function getRankingsSQL(type, query, params, offset) {
             data["user_id"] = parseInt(row.user_id)
             data["username"] = username
             data["country"] = country
-            data[type] = parseInt(row[type]) ?? 0
+            data[type] = parseInt(row[type] ?? 0)
 
             leaderboard.push(data)
         }
@@ -117,10 +115,10 @@ async function getCounts(user_id) {
         data["user_id"] = parseInt(user_id)
         data["username"] = username
         data["country"] = country
-        data["top50s"] = parseInt(await redis.zscore("top50s", user_id)) ?? 0
-        data["top25s"] = parseInt(await redis.zscore("top25s", user_id)) ?? 0
-        data["top8s"] = parseInt(await redis.zscore("top8s", user_id)) ?? 0
-        data["top1s"] = parseInt(await redis.zscore("top1s", user_id)) ?? 0
+        for (const count of COUNTS) {
+            const type = `top${count}s`
+            data[type] = parseInt(await redis.zscore(type, user_id) ?? 0)
+        }
 
         return data
     } catch (e) {
@@ -145,10 +143,10 @@ async function getCountsSQL(query, params) {
         data["user_id"] = parseInt(row.user_id)
         data["username"] = username
         data["country"] = country
-        data["top50s"] = parseInt(row.top50s) ?? 0
-        data["top25s"] = parseInt(row.top25s) ?? 0
-        data["top8s"] = parseInt(row.top8s) ?? 0
-        data["top1s"] = parseInt(row.top1s) ?? 0
+        for (const count of COUNTS) {
+            const type = `top${count}s`
+            data[type] = parseInt(row[type] ?? 0)
+        }
 
         return data
     } catch (e) {
