@@ -79,6 +79,37 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
     }
 }
 
+async function getRankingsSQL(type, query, params, offset) {
+    try {
+        const conn = await mariadb.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_DATABASE
+        })
+
+        const rows = await conn.query(query, params)
+        conn.end()
+
+        const leaderboard = []
+        for (const [index, row] of rows.entries()) {
+            let data = {}
+            const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
+            data["rank"] = parseInt(offset) + (index + 1)
+            data["user_id"] = parseInt(row.user_id)
+            data["username"] = username
+            data["country"] = country
+            data[type] = parseInt(row[type]) ?? 0
+
+            leaderboard.push(data)
+        }
+
+        return leaderboard
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
 async function getCounts(user_id) {
     try {
         let data = {}
@@ -98,18 +129,17 @@ async function getCounts(user_id) {
 }
 
 async function getCountsSQL(query, params) {
-    const conn = await mariadb.createConnection({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_DATABASE
-    })
-
-    const rows = await conn.query(query, params)
-    conn.end()
-    const row = rows[0]
-
     try {
+        const conn = await mariadb.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_DATABASE
+        })
+
+        const rows = await conn.query(query, params)
+        conn.end()
+        const row = rows[0]
         let data = {}
         const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
         data["user_id"] = parseInt(row.user_id)
@@ -134,4 +164,4 @@ async function getLastUpdate() {
     }
 }
 
-export { insertIntoRedis, getRankings, getCounts, getCountsSQL, getLastUpdate }
+export { insertIntoRedis, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate }
