@@ -4,6 +4,7 @@ import * as mariadb from "mariadb"
 import axios from "axios"
 import axiosRetry from 'axios-retry';
 import { insertIntoRedis } from "./redis.js"
+import { getMods } from "./mods.js"
 
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
@@ -35,6 +36,7 @@ async function fetchLeaderboardsV1(skip = 0) {
             const beatmapScores = response.data
             for (const [index, score] of beatmapScores.entries()) {
                 const position = index + 1
+                const mods = getMods(score.enabled_mods)
 
                 scoresToInsert.push([
                     beatmap_id,
@@ -56,12 +58,13 @@ async function fetchLeaderboardsV1(skip = 0) {
                     score.replay_available,
                     position,
                     score.user_id,
+                    mods.join()
                 ])
             }
 
             if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
-                const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
+                const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
                 console.log(new Date, `[${idx + 1}/${beatmapIds.length}]`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
