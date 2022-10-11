@@ -5,6 +5,7 @@ import logger from "morgan"
 import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
+import { getModsEnum } from './mods.js'
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -145,6 +146,13 @@ function getFilters(query, _params) {
         let tags = query.tags.replace(',', '%')
         filter += ` AND CONCAT(source, '|', tags, '|', artist, '|', title, '|', creator, '|', version) like ?`;
         params.push('%' + tags + '%');
+    }
+
+    if (query.mods) {
+        const mods_array = query.mods.match(/.{2}/g)
+        console.log(mods_array)
+        filter += ` AND enabled_mods = ?`;
+        params.push(getModsEnum(mods_array));
     }
 
     if (filter.length > 0)

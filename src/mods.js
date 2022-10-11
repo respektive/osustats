@@ -40,4 +40,12 @@ function getMods(enabled_mods) {
     return return_array
 }
 
-export { getMods }
+function getModsEnum(mods) {
+    let return_value = 0
+    mods.forEach(mod => {
+        return_value |= mods_enum[mod.toUpperCase()]
+    })
+    return return_value
+}
+
+export { getMods, getModsEnum }
