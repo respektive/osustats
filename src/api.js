@@ -55,6 +55,7 @@ app.get('/counts/:user_id', async (req, res) => {
     const query = `SELECT user_id, 
     SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) as top1s,
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
+    SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
     FROM osustats.scores WHERE user_id = ? AND beatmap_id IN
