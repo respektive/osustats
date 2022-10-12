@@ -163,7 +163,7 @@ function getFilters(query, _params) {
     }
 
     if (query.mods_exclude) {
-        const mods_array = query.mods_include.match(/.{2}/g)
+        const mods_array = query.mods_exclude.match(/.{2}/g)
         for (const mod of mods_array) {
             filter += ` AND mods NOT LIKE ?`;
             params.push(`%${mod}%`);
