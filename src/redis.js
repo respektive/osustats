@@ -118,6 +118,7 @@ async function getCounts(user_id) {
         for (const count of COUNTS) {
             const type = `top${count}s`
             data[type] = parseInt(await redis.zscore(type, user_id) ?? 0)
+            data[`${type}_rank`] = parseInt(await redis.zrevrank(type, user_id))
         }
 
         return data
