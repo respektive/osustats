@@ -36,7 +36,7 @@ app.get("/rankings/:type?", async (req, res) => {
 
     let { filter, params, filtered } = getFilters(req.query, [type, pos])
 
-    filter += `) GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
+    filter += ` GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
     params.push(parseInt(limit), parseInt(offset))
 
     let rankings
@@ -63,8 +63,6 @@ app.get('/counts/:user_id', async (req, res) => {
     (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
     let { filter, params } = getFilters(req.query, [user_id])
-
-    filter += ")"
 
     let counts
     if (Object.keys(req.query).length === 0) {
@@ -148,11 +146,28 @@ function getFilters(query, _params) {
         params.push('%' + tags + '%');
     }
 
+    filter += ")"
+
     if (query.mods) {
         const mods_array = query.mods.match(/.{2}/g)
-        console.log(mods_array)
         filter += ` AND enabled_mods = ?`;
         params.push(getModsEnum(mods_array));
+    }
+
+    if (query.mods_include) {
+        const mods_array = query.mods_include.match(/.{2}/g)
+        for (const mod of mods_array) {
+            filter += ` AND mods LIKE ?`;
+            params.push(`%${mod}%`);
+        }
+    }
+
+    if (query.mods_exclude) {
+        const mods_array = query.mods_include.match(/.{2}/g)
+        for (const mod of mods_array) {
+            filter += ` AND mods NOT LIKE ?`;
+            params.push(`%${mod}%`);
+        }
     }
 
     if (filter.length > 0)
