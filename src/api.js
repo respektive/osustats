@@ -62,6 +62,10 @@ app.get('/counts/:user_id', async (req, res) => {
     FROM osustats.scores WHERE user_id = ? AND beatmap_id IN
     (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
+    // useless for counts
+    delete req.query.page
+    delete req.query.limit
+
     let { filter, params } = getFilters(req.query, [user_id])
 
     let counts
