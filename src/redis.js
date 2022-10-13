@@ -119,7 +119,7 @@ async function getCounts(user_id) {
             const type = `top${count}s`
             data[type] = parseInt(await redis.zscore(type, user_id) ?? 0)
             const type_rank = parseInt(await redis.zrevrank(type, user_id))
-            data[`${type}_rank`] = isNan(type_rank) ? null : type_rank + 1
+            data[`${type}_rank`] = isNaN(type_rank) ? null : type_rank + 1
         }
 
         return data
