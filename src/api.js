@@ -150,8 +150,7 @@ function getFilters(query, _params) {
         params.push('%' + tags + '%');
     }
 
-    if (filter.length > 0)
-        filter += ")"
+    filter += ")"
 
     if (query.mods) {
         const mods_array = query.mods.match(/.{2}/g)
@@ -175,7 +174,7 @@ function getFilters(query, _params) {
         }
     }
 
-    if (filter.length > 0)
+    if (filter.length > 1)
         filtered = true
 
     return { filter, params, filtered }
