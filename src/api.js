@@ -31,7 +31,8 @@ app.get("/rankings/:type?", async (req, res) => {
         offset = (req.query.page - 1) * limit;
     }
 
-    const query = `SELECT user_id, count(score_id) as ? FROM osustats.scores 
+    const query = `SELECT scores.user_id, count(score_id) as ? FROM osustats.scores 
+    INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
     WHERE position<= ? AND beatmap_id IN (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
     let { filter, params, filtered } = getFilters(req.query, [type, pos])
@@ -53,13 +54,15 @@ app.get("/rankings/:type?", async (req, res) => {
 app.get('/counts/:user_id', async (req, res) => {
     const user_id = !Number.isNaN(req.params.user_id) ? req.params.user_id : 0
 
-    const query = `SELECT user_id, 
+    const query = `SELECT scores.user_id, 
     SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) as top1s,
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
-    FROM osustats.scores WHERE user_id = ? AND beatmap_id IN
+    FROM osustats.scores 
+    INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
+    WHERE user_id = ? AND beatmap_id IN
     (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
     // useless for counts
@@ -172,6 +175,11 @@ function getFilters(query, _params) {
             filter += ` AND mods NOT LIKE ?`;
             params.push(`%${mod}%`);
         }
+    }
+
+    if (query.country) {
+        filter += ` AND country = ?`;
+        params.push(query.country);
     }
 
     if (filter.length > 1)
