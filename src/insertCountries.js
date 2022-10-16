@@ -25,6 +25,7 @@ async function main() {
     }
     const res = await conn.batch("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", users_to_insert)
     console.log(res)
+    process.exit(0)
 }
 
 main()
