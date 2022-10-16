@@ -36,6 +36,7 @@ async function insertIntoRedis(clear = false) {
                 const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
                 const user = res.data[0]
                 await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
+                await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
             } else {
                 await redis.hset(row.user_id, { username: row.username })
             }
