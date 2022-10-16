@@ -13,7 +13,6 @@ async function main() {
     })
 
     const users = await redis.zrevrange("top50s", 0, -1)
-    console.log(users)
 
     let users_to_insert = []
     for (const user of users) {
