@@ -60,13 +60,13 @@ app.get('/counts/:user_id', async (req, res) => {
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
-    FROM osustats.scores WHERE user_id = ? AND beatmap_id IN
+    FROM osustats.scores INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
+    WHERE user_id = ? AND beatmap_id IN
     (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
 
     // useless for counts
     delete req.query.page
     delete req.query.limit
-    delete req.query.country
 
     let { filter, params, filtered } = getFilters(req.query, [user_id])
 
