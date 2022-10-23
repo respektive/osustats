@@ -129,7 +129,7 @@ async function getCounts(user_id) {
     }
 }
 
-async function getCountsSQL(query, params) {
+async function getCountsSQL(query, params, custom_rank) {
     try {
         const conn = await mariadb.createConnection({
             host: process.env.DB_HOST,
@@ -150,6 +150,8 @@ async function getCountsSQL(query, params) {
             const type = `top${count}s`
             data[type] = parseInt(row[type] ?? 0)
         }
+        if (custom_rank)
+            data[`rank_${custom_rank}`] = parseInt(row[`rank_${custom_rank}`] ?? 0)
 
         return data
     } catch (e) {

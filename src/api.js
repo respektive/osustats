@@ -52,9 +52,11 @@ app.get("/rankings/:type?", async (req, res) => {
 })
 
 app.get('/counts/:user_id', async (req, res) => {
-    const user_id = !Number.isNaN(req.params.user_id) ? req.params.user_id : 0
+    const user_id = !Number.isNaN(parseInt(req.params.user_id)) ? parseInt(req.params.user_id) : 0
+    const custom_rank = parseInt(req.query.rank)
 
-    const query = `SELECT scores.user_id, 
+    const query = `SELECT scores.user_id,
+    ${custom_rank ? `SUM(CASE WHEN position=${custom_rank} THEN 1 ELSE 0 END) as rank_${custom_rank},` : ""}
     SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) as top1s,
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
@@ -72,7 +74,7 @@ app.get('/counts/:user_id', async (req, res) => {
 
     let counts
     if (filtered) {
-        counts = await getCountsSQL(`${query} ${filter}`, params)
+        counts = await getCountsSQL(`${query} ${filter}`, params, custom_rank)
     } else {
         counts = await getCounts(user_id)   
     }
@@ -181,7 +183,7 @@ function getFilters(query, _params) {
         params.push(query.country);
     }
 
-    if (filter.length > 1)
+    if (filter.length > 1 || query.rank)
         filtered = true
 
     return { filter, params, filtered }
