@@ -51,6 +51,21 @@ async function insertIntoRedis(clear = false) {
     conn.end()
 }
 
+async function runSQL(query, params) {
+    try {
+        const conn = await mariadb.createConnection({
+            host: process.env.DB_HOST,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_DATABASE
+        })
+
+        return await conn.query(query, params)
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
 async function getRankings(type = "top50s", limit = 50, offset = 0) {
     try {
         if (limit >= 0) {
@@ -167,4 +182,4 @@ async function getLastUpdate() {
     }
 }
 
-export { insertIntoRedis, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate }
+export { insertIntoRedis, runSQL, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate }

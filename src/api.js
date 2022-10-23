@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 import express from "express"
 import logger from "morgan"
-import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL } from "./redis.js"
+import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
 import { getModsEnum } from './mods.js'
@@ -76,7 +76,12 @@ app.get('/counts/:user_id', async (req, res) => {
     if (filtered) {
         counts = await getCountsSQL(`${query} ${filter}`, params, custom_rank)
     } else {
-        counts = await getCounts(user_id)   
+        counts = await getCounts(user_id)
+        if (custom_rank) {
+            const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position = ?", [user_id, custom_rank])
+            if (Array.isArray(rows) && rows[0].amount)
+                counts[`rank_${custom_rank}`] = parseInt(rows[0].amount)
+        }
     }
 
     res.status(200)
@@ -183,7 +188,7 @@ function getFilters(query, _params) {
         params.push(query.country);
     }
 
-    if (filter.length > 1 || query.rank)
+    if (filter.length > 1)
         filtered = true
 
     return { filter, params, filtered }
