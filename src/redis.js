@@ -36,11 +36,11 @@ async function insertIntoRedis(clear = false) {
                     const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
                     const user = res.data[0]
                     await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
-                    await redis.hset(row.username, { user_id: row.user_id })
+                    await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
                     await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
                 } else {
                     await redis.hset(row.user_id, { username: row.username })
-                    await redis.hset(row.username, { user_id: row.user_id })
+                    await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
                 }
                 await redis.zadd(type, parseInt(row[type]), row.user_id)
                 counter += 1
@@ -198,7 +198,7 @@ async function getLastUpdate() {
 
 async function getUserId(username) {
     try {
-        return await redis.hget(username, "user_id")
+        return await redis.hget(username.toLowerCase(), "user_id")
     } catch (e) {
         return { "error": e.message }
     }
