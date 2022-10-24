@@ -165,8 +165,14 @@ async function getCountsSQL(query, params, custom_rank) {
             const type = `top${count}s`
             data[type] = parseInt(row[type] ?? 0)
         }
-        if (custom_rank)
-            data[`rank_${custom_rank}`] = parseInt(row[`rank_${custom_rank}`] ?? 0)
+        if (custom_rank && parseInt(custom_rank[0])) {
+            if (custom_rank.length == 1) {
+                data[`rank_${parseInt(custom_rank[0])}`] = parseInt(row[`rank_${parseInt(custom_rank[0])}`] ?? 0)
+            } else {
+                data[`rank_${parseInt(custom_rank[0]) + "-" + parseInt(custom_rank[1])}`] = parseInt(row[`rank_${parseInt(custom_rank[0]) + "-" + parseInt(custom_rank[1])}`] ?? 0)
+            }
+        }
+
 
         return data
     } catch (e) {

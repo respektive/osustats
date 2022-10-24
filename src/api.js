@@ -53,10 +53,12 @@ app.get("/rankings/:type?", async (req, res) => {
 
 app.get('/counts/:user_id', async (req, res) => {
     const user_id = !Number.isNaN(parseInt(req.params.user_id)) ? parseInt(req.params.user_id) : 0
-    const custom_rank = parseInt(req.query.rank)
+    let custom_rank
+    if (req.query.rank)
+        custom_rank = req.query.rank.split("-")
 
     const query = `SELECT scores.user_id,
-    ${custom_rank ? `SUM(CASE WHEN position=${custom_rank} THEN 1 ELSE 0 END) as rank_${custom_rank},` : ""}
+    ${custom_rank && parseInt(custom_rank[0]) ? `SUM(CASE WHEN position>=${parseInt(custom_rank[0])} AND position<=${parseInt(custom_rank[1]) || parseInt(custom_rank[0])} THEN 1 ELSE 0 END) as 'rank_${parseInt(custom_rank[0]) + (parseInt(custom_rank[1]) ? "-" + parseInt(custom_rank[1]) + "'" : "'")},` : ""}
     SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) as top1s,
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
@@ -77,10 +79,16 @@ app.get('/counts/:user_id', async (req, res) => {
         counts = await getCountsSQL(`${query} ${filter}`, params, custom_rank)
     } else {
         counts = await getCounts(user_id)
-        if (custom_rank) {
-            const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position = ?", [user_id, custom_rank])
-            if (Array.isArray(rows) && rows[0].amount)
-                counts[`rank_${custom_rank}`] = parseInt(rows[0].amount)
+        if (custom_rank && parseInt(custom_rank[0])) {
+            if (custom_rank.length == 1) {
+                const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position = ?", [user_id, parseInt(custom_rank[0])])
+                if (Array.isArray(rows) && rows[0].amount)
+                    counts[`rank_${parseInt(custom_rank[0])}`] = parseInt(rows[0].amount)
+            } else {
+                const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position >= ? AND position <= ?", [user_id, parseInt(custom_rank[0]), parseInt(custom_rank[1])])
+                if (Array.isArray(rows) && rows[0].amount)
+                    counts[`rank_${parseInt(custom_rank[0]) + "-" + parseInt(custom_rank[1])}`] = parseInt(rows[0].amount)
+            }
         }
     }
 
