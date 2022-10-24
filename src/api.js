@@ -2,7 +2,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 import express from "express"
 import logger from "morgan"
-import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL } from "./redis.js"
+import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL, getUserId } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
 import { getModsEnum } from './mods.js'
@@ -51,8 +51,20 @@ app.get("/rankings/:type?", async (req, res) => {
     res.json(rankings)
 })
 
-app.get('/counts/:user_id', async (req, res) => {
-    const user_id = !Number.isNaN(parseInt(req.params.user_id)) ? parseInt(req.params.user_id) : 0
+app.get('/counts/:user', async (req, res) => {
+    let user_id
+    if (+req.params.user) {
+        user_id = parseInt(req.params.user)
+    } else {
+        user_id = await getUserId(req.params.user)
+    }
+
+    if (!user_id) {
+        res.status(404)
+        res.json({ "error": "user not found" })
+        return
+    }
+
     let custom_rank
     if (req.query.rank)
         custom_rank = req.query.rank.split("-")

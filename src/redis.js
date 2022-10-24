@@ -17,38 +17,43 @@ async function insertIntoRedis(clear = false) {
         password: process.env.DB_PASSWORD,
         database: process.env.DB_DATABASE
     })
+    try {
+        for (const count of COUNTS) {
+            const type = `top${count}s`
 
-    for (const count of COUNTS) {
-        const type = `top${count}s`
+            const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
+            const rows = await conn.query(query)
+            console.log(`[${new Date().toISOString()}]`, type + ":", "MariaDB Row Count:", rows.length)
 
-        const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
-        const rows = await conn.query(query)
-        console.log(`[${new Date().toISOString()}]`, type + ":", "MariaDB Row Count:", rows.length)
-
-        if (clear === true) {
-            await redis.del(type)
-        }
-        let total = rows.length
-        console.log(`[${new Date().toISOString()}]`, type + ":", `inserting ${total} users into redis...`)
-        let counter = 0
-        for (const row of rows) {
-            if (!await redis.hget(row.user_id, "country")) {
-                const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
-                const user = res.data[0]
-                await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
-                await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
-            } else {
-                await redis.hset(row.user_id, { username: row.username })
+            if (clear === true) {
+                await redis.del(type)
             }
-            await redis.zadd(type, parseInt(row[type]), row.user_id)
-            counter += 1
-            console.log(`[${new Date().toISOString()}]`, `(${counter}/${total})`, row.user_id, row.username)
+            let total = rows.length
+            console.log(`[${new Date().toISOString()}]`, type + ":", `inserting ${total} users into redis...`)
+            let counter = 0
+            for (const row of rows) {
+                if (!await redis.hget(row.user_id, "country")) {
+                    const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
+                    const user = res.data[0]
+                    await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
+                    await redis.hset(row.username, { user_id: row.user_id })
+                    await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
+                } else {
+                    await redis.hset(row.user_id, { username: row.username })
+                    await redis.hset(row.username, { user_id: row.user_id })
+                }
+                await redis.zadd(type, parseInt(row[type]), row.user_id)
+                counter += 1
+                console.log(`[${new Date().toISOString()}]`, `(${counter}/${total})`, row.user_id, row.username)
+            }
+            console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
         }
-        console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
-    }
 
-    console.log(`[${new Date().toISOString()}]`, "done updating.")
-    conn.end()
+        console.log(`[${new Date().toISOString()}]`, "done updating.")
+        conn.end()
+    } catch (e) {
+        console.error(e)
+    }
 }
 
 async function runSQL(query, params) {
@@ -128,6 +133,8 @@ async function getCounts(user_id) {
     try {
         let data = {}
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
+        if (!username)
+            return { "error": "user not found" }
         data["user_id"] = parseInt(user_id)
         data["username"] = username
         data["country"] = country
@@ -158,6 +165,8 @@ async function getCountsSQL(query, params, custom_rank) {
         const row = rows[0]
         let data = {}
         const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
+        if (!username)
+            return { "error": "user not found" }
         data["user_id"] = parseInt(row.user_id)
         data["username"] = username
         data["country"] = country
@@ -173,7 +182,6 @@ async function getCountsSQL(query, params, custom_rank) {
             }
         }
 
-
         return data
     } catch (e) {
         return { "error": e.message }
@@ -188,4 +196,12 @@ async function getLastUpdate() {
     }
 }
 
-export { insertIntoRedis, runSQL, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate }
+async function getUserId(username) {
+    try {
+        return await redis.hget(username, "user_id")
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
+export { insertIntoRedis, runSQL, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate, getUserId }
