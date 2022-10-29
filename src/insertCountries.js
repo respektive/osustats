@@ -24,7 +24,7 @@ async function main() {
         ])
     }
     const res = await conn.batch("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", users_to_insert)
-    console.log(res)
+    console.log(`[${new Date().toISOString()}]`, res)
     process.exit(0)
 }
 

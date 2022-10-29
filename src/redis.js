@@ -52,8 +52,8 @@ async function insertIntoRedis(clear = false) {
         console.log(`[${new Date().toISOString()}]`, "done updating.")
         conn.end()
     } catch (e) {
-        console.error(e)
-        console.log("Something went wrong when trying to insert into redis, check error logs.")
+        console.error(`[${new Date().toISOString()}]`, e)
+        console.log(`[${new Date().toISOString()}]`, "Something went wrong when trying to insert into redis, check error logs.")
     }
 }
 
