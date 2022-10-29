@@ -73,6 +73,7 @@ async function fetchLeaderboardsV1(skip = 0) {
             }
         } catch (e) {
             console.error(e)
+            console.log(beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
             continue
         }
     }

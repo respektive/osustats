@@ -53,6 +53,7 @@ async function insertIntoRedis(clear = false) {
         conn.end()
     } catch (e) {
         console.error(e)
+        console.log("Something went wrong when trying to insert into redis, check error logs.")
     }
 }
 
