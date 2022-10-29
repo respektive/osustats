@@ -139,7 +139,7 @@ function getFilters(query, _params) {
 
     if (query.played_from) {
         filter += ` AND date >= ?`
-        params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
+        params.push(new Date(query.played_from).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.played_to) {
