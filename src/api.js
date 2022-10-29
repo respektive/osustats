@@ -128,13 +128,23 @@ function getFilters(query, _params) {
     let filter = ""
     let params = _params
     if (query.from) {
-        filter += ` AND approved_date > ?`;
+        filter += ` AND approved_date >= ?`;
         params.push(new Date(query.from).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.to) {
         filter += ` AND approved_date < ?`;
         params.push(new Date(query.to).toISOString().slice(0, 19).replace('T', ' '));
+    }
+
+    if (query.played_from) {
+        filter += ` AND date >= ?`
+        params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
+    }
+
+    if (query.played_to) {
+        filter += ` AND date < ?`
+        params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.length_min) {
