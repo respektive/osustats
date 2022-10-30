@@ -13,13 +13,6 @@ axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 async function fetchLeaderboardsV1(skip = 0) {
     console.log(`[${new Date().toISOString()}]`, "Starting Leaderboard fetching now.")
 
-    const conn = await mariadb.createConnection({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_DATABASE
-    })
-
     const beatmapsRes = await axios.get("https://osu.respektive.pw/beatmaps")
     const beatmaps = beatmapsRes.data
     let beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
@@ -65,11 +58,19 @@ async function fetchLeaderboardsV1(skip = 0) {
             }
 
             if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
+                const conn = await mariadb.createConnection({
+                    host: process.env.DB_HOST,
+                    user: process.env.DB_USER,
+                    password: process.env.DB_PASSWORD,
+                    database: process.env.DB_DATABASE
+                })
+
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
                 console.log(`[${new Date().toISOString()}]`, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
+                conn.end()
             }
         } catch (e) {
             console.error(`[${new Date().toISOString()}]`, e)
@@ -78,7 +79,6 @@ async function fetchLeaderboardsV1(skip = 0) {
         }
     }
 
-    conn.end()
     console.log(`[${new Date().toISOString()}]`, "done.")
     await insertIntoRedis()
     await redis.set("last_update", new Date().toISOString())
