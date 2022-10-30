@@ -8,6 +8,14 @@ import axiosRetry from 'axios-retry';
 import { insertIntoRedis } from "./redis.js"
 import { getMods } from "./mods.js"
 
+const pool = mariadb.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+    connectionLimit: 10
+})
+
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 async function fetchLeaderboardsV1(skip = 0) {
@@ -26,6 +34,7 @@ async function fetchLeaderboardsV1(skip = 0) {
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToClear.push(beatmap_id)
 
+        let conn
         try {
             const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=50`)
             const beatmapScores = response.data
@@ -58,24 +67,20 @@ async function fetchLeaderboardsV1(skip = 0) {
             }
 
             if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
-                const conn = await mariadb.createConnection({
-                    host: process.env.DB_HOST,
-                    user: process.env.DB_USER,
-                    password: process.env.DB_PASSWORD,
-                    database: process.env.DB_DATABASE
-                })
+                conn = await pool.getConnection();
 
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
                 console.log(`[${new Date().toISOString()}]`, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
-                conn.end()
             }
         } catch (e) {
             console.error(`[${new Date().toISOString()}]`, e)
             console.log(`[${new Date().toISOString()}]`, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
             continue
+        } finally {
+            if (conn) conn.release()
         }
     }
 
