@@ -55,7 +55,12 @@ app.get("/rankings/:type?", async (req, res) => {
         rankings = await getRankings(type, limit, offset)
     }
 
-    res.status(200)
+    if (rankings.error) {
+        res.status(404)
+    }
+    else {
+        res.status(200)
+    }
     res.json(rankings)
 })
 
@@ -115,8 +120,12 @@ app.get('/counts/:user', async (req, res) => {
             }
         }
     }
-
-    res.status(200)
+    if (counts.error) {
+        res.status(404)
+    }
+    else {
+        res.status(200)
+    }
     res.json(counts)
 })
 
