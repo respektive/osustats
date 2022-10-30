@@ -67,7 +67,7 @@ async function fetchLeaderboardsV1(skip = 0) {
             }
 
             if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
-                conn = await pool.getConnection();
+                conn = await pool.getConnection()
 
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)

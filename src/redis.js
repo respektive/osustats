@@ -8,16 +8,20 @@ import axios from "axios"
 import axiosRetry from 'axios-retry';
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
+const pool = mariadb.createPool({
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: process.env.DB_DATABASE,
+    connectionLimit: 10
+})
+
 const COUNTS = [1, 8, 15, 25, 50]
 
 async function insertIntoRedis(clear = false) {
-    const conn = await mariadb.createConnection({
-        host: process.env.DB_HOST,
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        database: process.env.DB_DATABASE
-    })
+    let conn
     try {
+        conn = await pool.getConnection()
         for (const count of COUNTS) {
             const type = `top${count}s`
 
@@ -50,25 +54,23 @@ async function insertIntoRedis(clear = false) {
         }
 
         console.log(`[${new Date().toISOString()}]`, "done updating.")
-        conn.end()
     } catch (e) {
         console.error(`[${new Date().toISOString()}]`, e)
         console.log(`[${new Date().toISOString()}]`, "Something went wrong when trying to insert into redis, check error logs.")
+    } finally {
+        if (conn) conn.release()
     }
 }
 
 async function runSQL(query, params) {
+    let conn
     try {
-        const conn = await mariadb.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_DATABASE
-        })
-
+        conn = await pool.getConnection()
         return await conn.query(query, params)
     } catch (e) {
         return { "error": e.message }
+    } finally {
+        if (conn) conn.release()
     }
 }
 
@@ -79,6 +81,7 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
         }
 
         const ranking = await redis.zrevrange(type, offset, limit - 1, "WITHSCORES")
+        const beatmaps = await axios.get("https://osu.respektive.pw/amount")
 
         const leaderboard = []
         for (let i = 0; i < ranking.length; i += 2) {
@@ -89,6 +92,7 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
             data["username"] = username
             data["country"] = country
             data[type] = parseInt(ranking[i + 1])
+            data["beatmaps_amount"] = beatmaps.data[0]["loved+ranked"]
 
             leaderboard.push(data)
         }
@@ -99,21 +103,18 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
     }
 }
 
-async function getRankingsSQL(type, query, params, offset) {
+async function getRankingsSQL(type, query, params, offset, beatmap) {
+    let conn
     try {
-        const conn = await mariadb.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_DATABASE
-        })
-
+        conn = await pool.getConnection()
         const rows = await conn.query(query, params)
-        conn.end()
+        const beatmap_rows = await conn.query(beatmap.query, beatmap.params)
 
         const leaderboard = []
         for (const [index, row] of rows.entries()) {
-            let data = {}
+            let data = {
+                "beatmaps_amount": parseInt(beatmap_rows[0]["beatmaps_amount"]),
+            }
             const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
             data["rank"] = parseInt(offset) + (index + 1)
             data["user_id"] = parseInt(row.user_id)
@@ -127,12 +128,18 @@ async function getRankingsSQL(type, query, params, offset) {
         return leaderboard
     } catch (e) {
         return { "error": e.message }
+    } finally {
+        if (conn) conn.release()
     }
 }
 
 async function getCounts(user_id) {
     try {
-        let data = {}
+        const beatmaps = await axios.get("https://osu.respektive.pw/amount")
+
+        let data = {
+            "beatmaps_amount": beatmaps.data[0]["loved+ranked"],
+        }
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
         if (!username)
             return { "error": "user not found" }
@@ -153,18 +160,14 @@ async function getCounts(user_id) {
 }
 
 async function getCountsSQL(query, params, custom_rank) {
+    let conn
     try {
-        const conn = await mariadb.createConnection({
-            host: process.env.DB_HOST,
-            user: process.env.DB_USER,
-            password: process.env.DB_PASSWORD,
-            database: process.env.DB_DATABASE
-        })
-
+        conn = await pool.getConnection()
         const rows = await conn.query(query, params)
-        conn.end()
         const row = rows[0]
-        let data = {}
+        let data = {
+            "beatmaps_amount": parseInt(row["beatmaps_amount"]),
+        }
         const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
         if (!username)
             return { "error": "user not found" }
@@ -186,6 +189,8 @@ async function getCountsSQL(query, params, custom_rank) {
         return data
     } catch (e) {
         return { "error": e.message }
+    } finally {
+        if (conn) conn.release()
     }
 }
 

@@ -31,9 +31,14 @@ app.get("/rankings/:type?", async (req, res) => {
         offset = (req.query.page - 1) * limit;
     }
 
-    const query = `SELECT scores.user_id, count(score_id) as ? FROM osustats.scores 
+    const query = `SELECT scores.user_id,
+    COUNT(score_id) as ? FROM osustats.scores 
     INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
-    WHERE position<= ? AND beatmap_id IN (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
+    INNER JOIN osu.beatmap ON osustats.scores.beatmap_id = osu.beatmap.beatmap_id
+    WHERE position <= ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode = 0`;
+
+    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode=0 AND approved>0 AND approved!=3`
+    const beatmap_filters = getFilters(req.query, [], true)
 
     let { filter, params, filtered } = getFilters(req.query, [type, pos])
 
@@ -42,7 +47,10 @@ app.get("/rankings/:type?", async (req, res) => {
 
     let rankings
     if (filtered) {
-        rankings = await getRankingsSQL(type, `${query} ${filter}`, params, offset)
+        rankings = await getRankingsSQL(type, `${query} ${filter}`, params, offset, {
+            query: `${beatmap_query} ${beatmap_filters.filter}`,
+            params: beatmap_filters.params
+        })
     } else {
         rankings = await getRankings(type, limit, offset)
     }
@@ -76,10 +84,12 @@ app.get('/counts/:user', async (req, res) => {
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
-    FROM osustats.scores INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
-    WHERE scores.user_id = ? AND beatmap_id IN
-    (SELECT beatmap_id FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode = 0`;
+    FROM osustats.scores INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id
+    INNER JOIN osu.beatmap ON osustats.scores.beatmap_id = osu.beatmap.beatmap_id
+    WHERE osustats.scores.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode = 0`;
 
+    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode=0 AND approved>0 AND approved!=3`
+    const beatmap_filters = getFilters(req.query, [], true)
     // useless for counts
     delete req.query.page
     delete req.query.limit
@@ -89,6 +99,8 @@ app.get('/counts/:user', async (req, res) => {
     let counts
     if (filtered) {
         counts = await getCountsSQL(`${query} ${filter}`, params, custom_rank)
+        const rows = await runSQL(`${beatmap_query} ${beatmap_filters.filter}`, beatmap_filters.params)
+        counts["beatmaps_amount"] = parseInt(rows[0].beatmaps_amount)
     } else {
         counts = await getCounts(user_id)
         if (custom_rank && parseInt(custom_rank[0])) {
@@ -123,47 +135,47 @@ app.listen(port, () => {
     console.log(`[${new Date().toISOString()}]`, `app listening on port ${port}`)
 })
 
-function getFilters(query, _params) {
+function getFilters(query, _params, b = false) {
     let filtered = false
     let filter = ""
     let params = _params
     if (query.from) {
-        filter += ` AND approved_date >= ?`;
+        filter += ` AND osu.beatmap.approved_date >= ?`;
         params.push(new Date(query.from).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.to) {
-        filter += ` AND approved_date < ?`;
+        filter += ` AND osu.beatmap.approved_date < ?`;
         params.push(new Date(query.to).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.played_from) {
-        filter += ` AND date >= ?`
+        filter += ` AND osustats.scores.date >= ?`
         params.push(new Date(query.played_from).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.played_to) {
-        filter += ` AND date < ?`
+        filter += ` AND osustats.scores.date < ?`
         params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.length_min) {
-        filter += ` AND total_length >= ?`;
+        filter += ` AND osu.beatmap.total_length >= ?`;
         params.push(query.length_min);
     }
 
     if (query.length_max) {
-        filter += ` AND total_length <= ?`;
+        filter += ` AND osu.beatmap.total_length <= ?`;
         params.push(query.length_max);
     }
 
     if (query.spinners_min) {
-        filter += ` AND num_spinners >= ?`;
+        filter += ` AND osu.beatmap.num_spinners >= ?`;
         params.push(query.spinners_min);
     }
 
     if (query.spinners_max) {
-        filter += ` AND num_spinners < ?`;
+        filter += ` AND osu.beatmap.num_spinners < ?`;
         params.push(query.spinners_max);
     }
 
@@ -178,47 +190,45 @@ function getFilters(query, _params) {
         if (range.length == 1)
             range.push(Math.floor(range[0] + 1));
 
-        filter += ` AND star_rating BETWEEN ? and ?`;
+        filter += ` AND osu.beatmap.star_rating BETWEEN ? and ?`;
 
         params.push(range[0], range[1]);
     }
 
     if (query.tags) {
         let tags = query.tags.replace(',', '%')
-        filter += ` AND CONCAT(source, '|', tags, '|', artist, '|', title, '|', creator, '|', version) like ?`;
+        filter += ` AND CONCAT(osu.beatmap.source, '|', osu.beatmap.tags, '|', osu.beatmap.artist, '|', osu.beatmap.title, '|', osu.beatmap.creator, '|', osu.beatmap.version) like ?`;
         params.push('%' + tags + '%');
     }
 
-    filter += ")"
-
-    if (query.mods) {
+    if (query.mods && !b) {
         const mods_array = query.mods.match(/.{2}/g)
-        filter += ` AND enabled_mods = ?`;
+        filter += ` AND osustats.scores.enabled_mods = ?`;
         params.push(getModsEnum(mods_array));
     }
 
-    if (query.mods_include) {
+    if (query.mods_include && !b) {
         const mods_array = query.mods_include.match(/.{2}/g)
         for (const mod of mods_array) {
-            filter += ` AND mods LIKE ?`;
+            filter += ` AND osuststs.scores.mods LIKE ?`;
             params.push(`%${mod}%`);
         }
     }
 
-    if (query.mods_exclude) {
+    if (query.mods_exclude && !b) {
         const mods_array = query.mods_exclude.match(/.{2}/g)
         for (const mod of mods_array) {
-            filter += ` AND mods NOT LIKE ?`;
+            filter += ` AND osustats.scores.mods NOT LIKE ?`;
             params.push(`%${mod}%`);
         }
     }
 
-    if (query.country) {
-        filter += ` AND country = ?`;
+    if (query.country && !b) {
+        filter += ` AND osustats.user_countries.country = ?`;
         params.push(query.country);
     }
 
-    if (filter.length > 1)
+    if (filter.length > 0)
         filtered = true
 
     return { filter, params, filtered }
