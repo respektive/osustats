@@ -19,7 +19,7 @@ const pool = mariadb.createPool({
 axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
 
 async function fetchLeaderboardsV1(skip = 0) {
-    console.log(`[${new Date().toISOString()}]`, "Starting Leaderboard fetching now.")
+    console.log("Starting Leaderboard fetching now.")
 
     const beatmapsRes = await axios.get("https://osu.respektive.pw/beatmaps")
     const beatmaps = beatmapsRes.data
@@ -71,20 +71,20 @@ async function fetchLeaderboardsV1(skip = 0) {
 
                 await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
                 const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
-                console.log(`[${new Date().toISOString()}]`, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                console.log(`(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
             }
         } catch (e) {
-            console.error(`[${new Date().toISOString()}]`, e)
-            console.log(`[${new Date().toISOString()}]`, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
+            console.error(e)
+            console.log(beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
             continue
         } finally {
             if (conn) conn.release()
         }
     }
 
-    console.log(`[${new Date().toISOString()}]`, "done.")
+    console.log("done.")
     await insertIntoRedis()
     await redis.set("last_update", new Date().toISOString())
 }

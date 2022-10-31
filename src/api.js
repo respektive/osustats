@@ -141,7 +141,7 @@ app.get("/*", async (req, res) => {
 })
 
 app.listen(port, () => {
-    console.log(`[${new Date().toISOString()}]`, `app listening on port ${port}`)
+    console.log(`app listening on port ${port}`)
 })
 
 function getFilters(query, _params, b = false) {

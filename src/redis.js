@@ -27,13 +27,13 @@ async function insertIntoRedis(clear = false) {
 
             const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
             const rows = await conn.query(query)
-            console.log(`[${new Date().toISOString()}]`, type + ":", "MariaDB Row Count:", rows.length)
+            console.log(type + ":", "MariaDB Row Count:", rows.length)
 
             if (clear === true) {
                 await redis.del(type)
             }
             let total = rows.length
-            console.log(`[${new Date().toISOString()}]`, type + ":", `inserting ${total} users into redis...`)
+            console.log(type + ":", `inserting ${total} users into redis...`)
             let counter = 0
             for (const row of rows) {
                 if (!await redis.hget(row.user_id, "country")) {
@@ -48,15 +48,15 @@ async function insertIntoRedis(clear = false) {
                 }
                 await redis.zadd(type, parseInt(row[type]), row.user_id)
                 counter += 1
-                console.log(`[${new Date().toISOString()}]`, `(${counter}/${total})`, row.user_id, row.username)
+                console.log(`(${counter}/${total})`, row.user_id, row.username)
             }
-            console.log(`[${new Date().toISOString()}]`, type + ":", "done inserting into redis.")
+            console.log(type + ":", "done inserting into redis.")
         }
 
-        console.log(`[${new Date().toISOString()}]`, "done updating.")
+        console.log("done updating.")
     } catch (e) {
-        console.error(`[${new Date().toISOString()}]`, e)
-        console.log(`[${new Date().toISOString()}]`, "Something went wrong when trying to insert into redis, check error logs.")
+        console.error(e)
+        console.log("Something went wrong when trying to insert into redis, check error logs.")
     } finally {
         if (conn) conn.release()
     }
