@@ -3,6 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
+import fetch from 'node-fetch';
 
 import axios from "axios"
 import axiosRetry from 'axios-retry';
@@ -18,27 +19,28 @@ const pool = mariadb.createPool({
 
 const COUNTS = [1, 8, 15, 25, 50]
 
-async function insertIntoRedis(clear = false) {
+async function insertIntoRedis(clear = false, mode = "") {
     let conn
     try {
         conn = await pool.getConnection()
         for (const count of COUNTS) {
-            const type = `top${count}s`
+            const type = `top${count}s${mode}`
 
-            const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
+            const query = `SELECT user_id, username, COUNT(score_id) AS ${type} FROM scores${mode} WHERE position <= ${count} GROUP BY user_id ORDER BY ${type} DESC`
             const rows = await conn.query(query)
-            console.log(type + ":", "MariaDB Row Count:", rows.length)
+            console.log(mode, type + ":", "MariaDB Row Count:", rows.length)
 
             if (clear === true) {
                 await redis.del(type)
             }
             let total = rows.length
-            console.log(type + ":", `inserting ${total} users into redis...`)
+            console.log(mode, type + ":", `inserting ${total} users into redis...`)
             let counter = 0
             for (const row of rows) {
                 if (!await redis.hget(row.user_id, "country")) {
-                    const res = await axios.get(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
-                    const user = res.data[0]
+                    const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
+                    const json = res.json()
+                    const user = json[0]
                     await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
                     await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
                     await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
@@ -50,13 +52,15 @@ async function insertIntoRedis(clear = false) {
                 counter += 1
                 console.log(`(${counter}/${total})`, row.user_id, row.username)
             }
-            console.log(type + ":", "done inserting into redis.")
+            console.log(mode, type + ":", "done inserting into redis.")
         }
 
         console.log("done updating.")
+        return 0
     } catch (e) {
         console.error(e)
         console.log("Something went wrong when trying to insert into redis, check error logs.")
+        return 1
     } finally {
         if (conn) conn.release()
     }

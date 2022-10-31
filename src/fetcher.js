@@ -3,8 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
-import axios from "axios"
-import axiosRetry from 'axios-retry';
+import fetch from 'node-fetch'
 import { insertIntoRedis } from "./redis.js"
 import { getMods } from "./mods.js"
 
@@ -16,14 +15,42 @@ const pool = mariadb.createPool({
     connectionLimit: 10
 })
 
-axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
+async function fetchLeaderboardsV1(skip = 0, mode = 0) {
+    console.log(mode, "Starting Leaderboard fetching now.")
 
-async function fetchLeaderboardsV1(skip = 0) {
-    console.log("Starting Leaderboard fetching now.")
-
-    const beatmapsRes = await axios.get("https://osu.respektive.pw/beatmaps")
-    const beatmaps = beatmapsRes.data
+    const res = await fetch("https://osu.respektive.pw/beatmaps")
+    const beatmaps = await res.json()
     let beatmapIds = beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps)
+
+    let modeString
+    switch (parseInt(mode)) {
+        case 3: {
+            modeString = "_mania"
+            const res = await fetch("https://osu.respektive.pw/beatmaps?mode=3")
+            const beatmaps = await res.json()
+            beatmapIds = beatmapIds.concat(beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps))
+            break
+        }
+        case 2: {
+            modeString = "_catch"
+            const res = await fetch("https://osu.respektive.pw/beatmaps?mode=2")
+            const beatmaps = await res.json()
+            beatmapIds = beatmapIds.concat(beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps))
+            break
+        }
+        case 1: {
+            modeString = "_taiko"
+            const res = await fetch("https://osu.respektive.pw/beatmaps?mode=1")
+            const beatmaps = await res.json()
+            beatmapIds = beatmapIds.concat(beatmaps.ranked.beatmaps.concat(beatmaps.loved.beatmaps))
+            break
+        }
+        default: {
+            modeString = ""
+            break
+        }
+    }
+
     if (skip > 0) {
         beatmapIds = beatmapIds.slice(skip)
     }
@@ -36,8 +63,8 @@ async function fetchLeaderboardsV1(skip = 0) {
 
         let conn
         try {
-            const response = await axios.get(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=0&limit=50`)
-            const beatmapScores = response.data
+            const response = await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=${mode}&limit=50`)
+            const beatmapScores = await response.json()
             for (const [index, score] of beatmapScores.entries()) {
                 const position = index + 1
                 const mods = getMods(score.enabled_mods)
@@ -69,23 +96,23 @@ async function fetchLeaderboardsV1(skip = 0) {
             if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
                 conn = await pool.getConnection()
 
-                await conn.query("DELETE FROM scores WHERE beatmap_id IN (?)", [beatmapsToClear])
-                const res = await conn.batch("INSERT INTO scores VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)", scoresToInsert)
-                console.log(`(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                await conn.query(`DELETE FROM scores${modeString} WHERE beatmap_id IN (?)`, [beatmapsToClear])
+                const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, scoresToInsert)
+                console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                 scoresToInsert = []
                 beatmapsToClear = []
             }
         } catch (e) {
             console.error(e)
-            console.log(beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
+            console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
             continue
         } finally {
             if (conn) conn.release()
         }
     }
 
-    console.log("done.")
-    await insertIntoRedis()
+    console.log(mode, "done.")
+    await insertIntoRedis(false, modeString)
     await redis.set("last_update", new Date().toISOString())
 }
 
