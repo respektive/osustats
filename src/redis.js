@@ -56,7 +56,7 @@ async function insertIntoRedis(clear = false, mode = "") {
                 }
                 await redis.zadd(type, parseInt(row[type]), row.user_id)
                 counter += 1
-                console.log(`(${counter}/${total})`, row.user_id, row.username)
+                console.log(type, `(${counter}/${total})`, row.user_id, row.username)
             }
             console.log(mode, type + ":", "done inserting into redis.")
         }
