@@ -42,7 +42,7 @@ async function insertIntoRedis(clear = false, mode = "") {
                     let user
                     try {
                         const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
-                        const json = res.json()
+                        const json = await res.json()
                         user = json[0]
                     } catch (e) {
                         console.error(e)
