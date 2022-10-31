@@ -37,7 +37,8 @@ async function insertIntoRedis(clear = false, mode = "") {
             console.log(mode, type + ":", `inserting ${total} users into redis...`)
             let counter = 0
             for (const row of rows) {
-                if (!await redis.hget(row.user_id, "country")) {
+                const country = await redis.hget(row.user_id, "country")
+                if (!country) {
                     let user
                     try {
                         const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
@@ -56,7 +57,7 @@ async function insertIntoRedis(clear = false, mode = "") {
                 }
                 await redis.zadd(type, parseInt(row[type]), row.user_id)
                 counter += 1
-                console.log(type, `(${counter}/${total})`, row.user_id, row.username)
+                console.log(type, `(${counter}/${total})`, row.user_id, row.username, country)
             }
             console.log(mode, type + ":", "done inserting into redis.")
         }
