@@ -2,6 +2,7 @@ import * as dotenv from 'dotenv'
 dotenv.config()
 import express from "express"
 import logger from "morgan"
+import statusMonitor from "express-status-monitor"
 import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL, getUserId } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
@@ -17,6 +18,7 @@ const port = process.env.PORT
 
 app.use(express.static(path.join(__dirname, "frontend", "build")))
 app.use(logger("dev"))
+app.use(statusMonitor());
 
 app.get("/rankings/:type?", async (req, res) => {
     const type = req.params.type && TYPES.includes(req.params.type) ? req.params.type : "top50s"
