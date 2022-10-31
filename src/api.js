@@ -17,6 +17,7 @@ const port = process.env.PORT
 
 app.use(express.static(path.join(__dirname, "frontend", "build")))
 app.use(logger("dev"))
+api.use(require('express-status-monitor')());
 
 app.get("/rankings/:type?", async (req, res) => {
     const type = req.params.type && TYPES.includes(req.params.type) ? req.params.type : "top50s"
