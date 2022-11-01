@@ -5,10 +5,6 @@ import Redis from "ioredis"
 const redis = new Redis();
 import fetch from 'node-fetch';
 
-import axios from "axios"
-import axiosRetry from 'axios-retry';
-axiosRetry(axios, { retries: 3, retryDelay: axiosRetry.exponentialDelay })
-
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -23,6 +19,26 @@ async function insertIntoRedis(clear = false, mode = "") {
     let conn
     try {
         conn = await pool.getConnection()
+
+        for (const mode of [0, 1, 2, 3]) {
+            const query = `SELECT count(beatmap_id) AS amount FROM osu.beatmap WHERE approved > 0 AND approved != 3 AND mode IN (0,${mode})`
+            const rows = await conn.query(query)
+            switch (mode) {
+                case 0:
+                    await redis.set("beatmaps_amount", rows[0]["amount"])
+                    break
+                case 1:
+                    await redis.set("beatmaps_amount_taiko", rows[0]["amount"])
+                    break
+                case 2:
+                    await redis.set("beatmaps_amount_catch", rows[0]["amount"])
+                    break
+                case 3:
+                    await redis.set("beatmaps_amount_mania", rows[0]["amount"])
+                    break
+            }
+        }
+
         for (const count of COUNTS) {
             const type = `top${count}s${mode}`
 
@@ -92,7 +108,6 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
         }
 
         const ranking = await redis.zrevrange(type, offset, limit - 1, "WITHSCORES")
-        const beatmaps = await axios.get("https://osu.respektive.pw/amount")
 
         const leaderboard = []
         for (let i = 0; i < ranking.length; i += 2) {
@@ -103,7 +118,7 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
             data["username"] = username
             data["country"] = country
             data[type] = parseInt(ranking[i + 1])
-            data["beatmaps_amount"] = beatmaps.data[0]["loved+ranked"]
+            data["beatmaps_amount"] = await redis.get("beatmaps_amount")
 
             leaderboard.push(data)
         }
@@ -146,10 +161,8 @@ async function getRankingsSQL(type, query, params, offset, beatmap) {
 
 async function getCounts(user_id) {
     try {
-        const beatmaps = await axios.get("https://osu.respektive.pw/amount")
-
         let data = {
-            "beatmaps_amount": beatmaps.data[0]["loved+ranked"],
+            "beatmaps_amount": await redis.get("beatmaps_amount"),
         }
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
         if (!username)
