@@ -221,7 +221,7 @@ function getFilters(query, _params, b = false) {
     if (query.mods_include && !b) {
         const mods_array = query.mods_include.match(/.{2}/g)
         for (const mod of mods_array) {
-            filter += ` AND osuststs.scores.mods LIKE ?`;
+            filter += ` AND osustats.scores.mods LIKE ?`;
             params.push(`%${mod}%`);
         }
     }
