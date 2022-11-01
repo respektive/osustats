@@ -118,7 +118,7 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
             data["username"] = username
             data["country"] = country
             data[type] = parseInt(ranking[i + 1])
-            data["beatmaps_amount"] = await redis.get("beatmaps_amount")
+            data["beatmaps_amount"] = parseInt(await redis.get("beatmaps_amount"))
 
             leaderboard.push(data)
         }
@@ -162,7 +162,7 @@ async function getRankingsSQL(type, query, params, offset, beatmap) {
 async function getCounts(user_id) {
     try {
         let data = {
-            "beatmaps_amount": await redis.get("beatmaps_amount"),
+            "beatmaps_amount": parseInt(await redis.get("beatmaps_amount")),
         }
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
         if (!username)
