@@ -105,6 +105,8 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
         } catch (e) {
             console.error(e)
             console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
+            scoresToInsert = []
+            beatmapsToClear = []
             continue
         } finally {
             if (conn) conn.release()
