@@ -53,27 +53,32 @@ async function insertIntoRedis(clear = false, mode = "") {
             console.log(mode, type + ":", `inserting ${total} users into redis...`)
             let counter = 0
             for (const row of rows) {
-                const country = await redis.hget(row.user_id, "country")
-                if (!country) {
-                    let user
-                    try {
-                        const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
-                        const json = await res.json()
-                        user = json[0]
-                    } catch (e) {
-                        console.error(e)
-                        console.log("some error with osu api, skipping user ", row.user_id)
+                try {
+                    const country = await redis.hget(row.user_id, "country")
+                    if (!country) {
+                        let user
+                        try {
+                            const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
+                            const json = await res.json()
+                            user = json[0]
+                        } catch (e) {
+                            console.error(e)
+                            console.log("some error with osu api, skipping user ", row.user_id)
+                        }
+                        await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
+                        await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
+                        await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
+                    } else {
+                        await redis.hset(row.user_id, { username: row.username })
+                        await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
                     }
-                    await redis.hset(row.user_id, { username: row.username, country: user?.country ?? null })
-                    await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
-                    await conn.query("INSERT INTO user_countries VALUES (?, ?) ON DUPLICATE KEY UPDATE country = ?", [row.user_id, user?.country ?? null, user?.country ?? null])
-                } else {
-                    await redis.hset(row.user_id, { username: row.username })
-                    await redis.hset(row.username.toLowerCase(), { user_id: row.user_id })
+                    await redis.zadd(type, parseInt(row[type]), row.user_id)
+                    counter += 1
+                    console.log(type, `(${counter}/${total})`, row.user_id, row.username, country)
+                } catch (e) {
+                    console.error(e)
+                    console.log("Skipping row: ", row)
                 }
-                await redis.zadd(type, parseInt(row[type]), row.user_id)
-                counter += 1
-                console.log(type, `(${counter}/${total})`, row.user_id, row.username, country)
             }
             console.log(mode, type + ":", "done inserting into redis.")
         }
