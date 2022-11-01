@@ -63,7 +63,7 @@ app.get("/rankings/:type?", async (req, res) => {
     const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode in (0,${MODE_NUMBER[mode]}) AND approved>0 AND approved!=3`
     const beatmap_filters = getFilters(req.query, [], true)
 
-    let { filter, params, filtered } = getFilters(req.query, [type, pos])
+    let { filter, params, filtered } = getFilters(req.query, [type, pos], false, scores_table)
 
     filter += ` GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
     params.push(parseInt(limit), parseInt(offset))
@@ -136,7 +136,7 @@ app.get('/counts/:user', async (req, res) => {
     delete req.query.page
     delete req.query.limit
 
-    let { filter, params, filtered } = getFilters(req.query, [user_id])
+    let { filter, params, filtered } = getFilters(req.query, [user_id], false, scores_table)
 
     let counts
     if (filtered) {
@@ -181,7 +181,7 @@ app.listen(port, () => {
     console.log(`app listening on port ${port}`)
 })
 
-function getFilters(query, _params, b = false) {
+function getFilters(query, _params, b = false, scores_table) {
     let filtered = false
     let filter = ""
     let params = _params
@@ -196,12 +196,12 @@ function getFilters(query, _params, b = false) {
     }
 
     if (query.played_from && !b) {
-        filter += ` AND osustats.scores.date >= ?`
+        filter += ` AND osustats.${scores_table}.date >= ?`
         params.push(new Date(query.played_from).toISOString().slice(0, 19).replace('T', ' '));
     }
 
     if (query.played_to && !b) {
-        filter += ` AND osustats.scores.date < ?`
+        filter += ` AND osustats.${scores_table}.date < ?`
         params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
     }
 
@@ -249,14 +249,14 @@ function getFilters(query, _params, b = false) {
 
     if (query.mods && !b) {
         const mods_array = query.mods.match(/.{2}/g)
-        filter += ` AND osustats.scores.enabled_mods = ?`;
+        filter += ` AND osustats.${scores_table}.enabled_mods = ?`;
         params.push(getModsEnum(mods_array));
     }
 
     if (query.mods_include && !b) {
         const mods_array = query.mods_include.match(/.{2}/g)
         for (const mod of mods_array) {
-            filter += ` AND osustats.scores.mods LIKE ?`;
+            filter += ` AND osustats.${scores_table}.mods LIKE ?`;
             params.push(`%${mod}%`);
         }
     }
@@ -264,7 +264,7 @@ function getFilters(query, _params, b = false) {
     if (query.mods_exclude && !b) {
         const mods_array = query.mods_exclude.match(/.{2}/g)
         for (const mod of mods_array) {
-            filter += ` AND osustats.scores.mods NOT LIKE ?`;
+            filter += ` AND osustats.${scores_table}.mods NOT LIKE ?`;
             params.push(`%${mod}%`);
         }
     }
