@@ -101,12 +101,16 @@ async function runSQL(query, params) {
     }
 }
 
-async function getRankings(type = "top50s", limit = 50, offset = 0) {
+async function getRankings(_type = "top50s", limit = 50, offset = 0, mode) {
     try {
+        let _mode = `_${mode}`
+        if (mode == "osu") {
+            _mode = ""
+        }
         if (limit >= 0) {
             limit = parseInt(limit) + parseInt(offset)
         }
-
+        const type = _type + _mode
         const ranking = await redis.zrevrange(type, offset, limit - 1, "WITHSCORES")
 
         const leaderboard = []
@@ -117,8 +121,8 @@ async function getRankings(type = "top50s", limit = 50, offset = 0) {
             data["user_id"] = parseInt(ranking[i])
             data["username"] = username
             data["country"] = country
-            data[type] = parseInt(ranking[i + 1])
-            data["beatmaps_amount"] = parseInt(await redis.get("beatmaps_amount"))
+            data[_type] = parseInt(ranking[i + 1])
+            data["beatmaps_amount"] = parseInt(await redis.get(`beatmaps_amount${_mode}`))
 
             leaderboard.push(data)
         }
@@ -159,10 +163,14 @@ async function getRankingsSQL(type, query, params, offset, beatmap) {
     }
 }
 
-async function getCounts(user_id) {
+async function getCounts(user_id, mode) {
     try {
+        let _mode = `_${mode}`
+        if (mode == "osu") {
+            _mode = ""
+        }
         let data = {
-            "beatmaps_amount": parseInt(await redis.get("beatmaps_amount")),
+            "beatmaps_amount": parseInt(await redis.get(`beatmaps_amount${_mode}`)),
         }
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
         if (!username)
@@ -172,8 +180,8 @@ async function getCounts(user_id) {
         data["country"] = country
         for (const count of COUNTS) {
             const type = `top${count}s`
-            data[type] = parseInt(await redis.zscore(type, user_id) ?? 0)
-            const type_rank = parseInt(await redis.zrevrank(type, user_id))
+            data[type] = parseInt(await redis.zscore(type + _mode, user_id) ?? 0)
+            const type_rank = parseInt(await redis.zrevrank(type + _mode, user_id))
             data[`${type}_rank`] = isNaN(type_rank) ? null : type_rank + 1
         }
 
@@ -186,12 +194,12 @@ async function getCounts(user_id) {
 async function getCountsSQL(query, params, custom_rank) {
     let conn
     try {
-        const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
-        if (!username)
-            return { "error": "user not found" }
         conn = await pool.getConnection()
         const rows = await conn.query(query, params)
         const row = rows[0]
+        const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
+        if (!username)
+            return { "error": "user not found" }
         let data = {
             "beatmaps_amount": parseInt(row["beatmaps_amount"]),
         }

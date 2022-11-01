@@ -12,6 +12,13 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const TYPES = ["top50s", "top25s", "top15s", "top8s", "top1s"]
+const MODES = ["osu", "taiko", "catch", "mania"]
+const MODE_NUMBER = {
+    "osu": 0,
+    "taiko": 1,
+    "catch": 2,
+    "mania": 3
+}
 
 const app = express()
 const port = process.env.PORT
@@ -26,6 +33,20 @@ app.get("/rankings/:type?", async (req, res) => {
     let offset = req.query.offset ?? 0
     const pos = parseInt(type.replace(/\D/g, ""))
 
+    let mode
+    if (+req.query.mode) {
+        mode = MODES[+req.query.mode]
+    } else if (req.query.mode) {
+        mode = req.query.mode.toLowerCase()
+    }
+    if (!mode || !MODES.includes(mode)) {
+        mode = "osu"
+    }
+    let scores_table = "scores"
+    if (mode != "osu" && MODES.includes(mode)) {
+        scores_table = `scores_${mode}`
+    }
+
     if (req.query.page) {
         if (req.query.page < 1 || isNaN(req.query.page)) {
             req.query.page = 1;
@@ -33,13 +54,13 @@ app.get("/rankings/:type?", async (req, res) => {
         offset = (req.query.page - 1) * limit;
     }
 
-    const query = `SELECT scores.user_id,
-    COUNT(score_id) as ? FROM osustats.scores 
-    INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id 
-    INNER JOIN osu.beatmap ON osustats.scores.beatmap_id = osu.beatmap.beatmap_id
-    WHERE position <= ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode = 0`;
+    const query = `SELECT ${scores_table}.user_id,
+    COUNT(score_id) as ? FROM osustats.${scores_table} 
+    INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id 
+    INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
+    WHERE position <= ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
 
-    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode=0 AND approved>0 AND approved!=3`
+    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode in (0,${MODE_NUMBER[mode]}) AND approved>0 AND approved!=3`
     const beatmap_filters = getFilters(req.query, [], true)
 
     let { filter, params, filtered } = getFilters(req.query, [type, pos])
@@ -54,7 +75,7 @@ app.get("/rankings/:type?", async (req, res) => {
             params: beatmap_filters.params
         })
     } else {
-        rankings = await getRankings(type, limit, offset)
+        rankings = await getRankings(type, limit, offset, mode)
     }
 
     if (rankings.error) {
@@ -74,6 +95,20 @@ app.get('/counts/:user', async (req, res) => {
         user_id = await getUserId(req.params.user)
     }
 
+    let mode
+    if (+req.query.mode) {
+        mode = MODES[+req.query.mode]
+    } else if (req.query.mode) {
+        mode = req.query.mode.toLowerCase()
+    }
+    if (!mode || !MODES.includes(mode)) {
+        mode = "osu"
+    }
+    let scores_table = "scores"
+    if (mode != "osu" && MODES.includes(mode)) {
+        scores_table = `scores_${mode}`
+    }
+
     if (!user_id) {
         res.status(404)
         res.json({ "error": "user not found" })
@@ -84,18 +119,18 @@ app.get('/counts/:user', async (req, res) => {
     if (req.query.rank)
         custom_rank = req.query.rank.split("-")
 
-    const query = `SELECT scores.user_id,
+    const query = `SELECT ${scores_table}.user_id,
     ${custom_rank && parseInt(custom_rank[0]) ? `SUM(CASE WHEN position>=${parseInt(custom_rank[0])} AND position<=${parseInt(custom_rank[1]) || parseInt(custom_rank[0])} THEN 1 ELSE 0 END) as 'rank_${parseInt(custom_rank[0]) + (parseInt(custom_rank[1]) ? "-" + parseInt(custom_rank[1]) + "'" : "'")},` : ""}
     SUM(CASE WHEN position=1 THEN 1 ELSE 0 END) as top1s,
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
-    FROM osustats.scores INNER JOIN osustats.user_countries ON osustats.scores.user_id = osustats.user_countries.user_id
-    INNER JOIN osu.beatmap ON osustats.scores.beatmap_id = osu.beatmap.beatmap_id
-    WHERE osustats.scores.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode = 0`;
+    FROM osustats.${scores_table} INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id
+    INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
+    WHERE osustats.${scores_table}.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
 
-    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode=0 AND approved>0 AND approved!=3`
+    const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode in (0,${MODE_NUMBER[mode]}) AND approved>0 AND approved!=3`
     const beatmap_filters = getFilters(req.query, [], true)
     // useless for counts
     delete req.query.page
@@ -109,14 +144,14 @@ app.get('/counts/:user', async (req, res) => {
         const rows = await runSQL(`${beatmap_query} ${beatmap_filters.filter}`, beatmap_filters.params)
         counts["beatmaps_amount"] = parseInt(rows[0].beatmaps_amount)
     } else {
-        counts = await getCounts(user_id)
+        counts = await getCounts(user_id, mode)
         if (custom_rank && parseInt(custom_rank[0])) {
             if (custom_rank.length == 1) {
-                const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position = ?", [user_id, parseInt(custom_rank[0])])
+                const rows = await runSQL(`SELECT COUNT(score_id) as amount FROM osustats.${scores_table} WHERE ${scores_table}.user_id = ? AND position = ?`, [user_id, parseInt(custom_rank[0])])
                 if (Array.isArray(rows) && rows[0].amount)
                     counts[`rank_${parseInt(custom_rank[0])}`] = parseInt(rows[0].amount)
             } else {
-                const rows = await runSQL("SELECT COUNT(score_id) as amount FROM osustats.scores WHERE scores.user_id = ? AND position >= ? AND position <= ?", [user_id, parseInt(custom_rank[0]), parseInt(custom_rank[1])])
+                const rows = await runSQL(`SELECT COUNT(score_id) as amount FROM osustats.${scores_table} WHERE ${scores_table}.user_id = ? AND position >= ? AND position <= ?`, [user_id, parseInt(custom_rank[0]), parseInt(custom_rank[1])])
                 if (Array.isArray(rows) && rows[0].amount)
                     counts[`rank_${parseInt(custom_rank[0]) + "-" + parseInt(custom_rank[1])}`] = parseInt(rows[0].amount)
             }
