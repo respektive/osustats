@@ -186,15 +186,15 @@ async function getCounts(user_id) {
 async function getCountsSQL(query, params, custom_rank) {
     let conn
     try {
+        const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
+        if (!username)
+            return { "error": "user not found" }
         conn = await pool.getConnection()
         const rows = await conn.query(query, params)
         const row = rows[0]
         let data = {
             "beatmaps_amount": parseInt(row["beatmaps_amount"]),
         }
-        const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
-        if (!username)
-            return { "error": "user not found" }
         data["user_id"] = parseInt(row.user_id)
         data["username"] = username
         data["country"] = country
