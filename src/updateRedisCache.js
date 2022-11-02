@@ -16,8 +16,8 @@ async function main() {
         await insertIntoRedis(clear, mode)
     } else {
         await insertIntoRedis(clear, "")
-        await insertIntoRedis(clear, "_catch")
         await insertIntoRedis(clear, "_taiko")
+        await insertIntoRedis(clear, "_catch")
         await insertIntoRedis(clear, "_mania")
     }
     console.timeEnd("Redis Update")
