@@ -151,15 +151,17 @@ app.get('/counts/:user', async (req, res) => {
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
     FROM osustats.${scores_table}
-    ${req.query.country ? `INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id` : ""}
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
     WHERE osustats.${scores_table}.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
 
     const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode in (0,${MODE_NUMBER[mode]}) AND approved>0 AND approved!=3`
     const beatmap_filters = getFilters(req.query, [], true)
+
     // useless for counts
     delete req.query.page
     delete req.query.limit
+    // when checking a single user, filtering by country is kinda useless?
+    delete req.query.country
 
     let { filter, params, filtered } = getFilters(req.query, [user_id], false, scores_table)
 
