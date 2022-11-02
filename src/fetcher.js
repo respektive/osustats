@@ -115,7 +115,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
 
     console.log(mode, "done.")
     await insertIntoRedis(false, modeString)
-    if (mode = 0)
+    if (parseInt(mode) === 0)
         await redis.set("last_update", new Date().toISOString())
 }
 
