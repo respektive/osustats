@@ -19,7 +19,8 @@ async function main() {
             fetchLeaderboardsV1(skip, 2),
             fetchLeaderboardsV1(skip, 3),
         ])
-        await setLastUpdate()
+        if (skip == 0)
+            await setLastUpdate()
     }
     console.timeEnd("Fetcher")
     process.exit(0)
