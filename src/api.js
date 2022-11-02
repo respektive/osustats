@@ -20,6 +20,10 @@ const MODE_NUMBER = {
     "mania": 3
 }
 
+function isValidDate(d) {
+    return d instanceof Date && !isNaN(d);
+}
+
 const app = express()
 const port = process.env.PORT
 
@@ -69,7 +73,7 @@ app.get("/rankings/:type?", async (req, res) => {
 
     const query = `SELECT ${scores_table}.user_id,
     COUNT(score_id) as ? FROM osustats.${scores_table} 
-    INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id 
+    ${req.query.country ? `INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id` : ""} 
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
     WHERE ${type == "custom" && +pos[0] ? `position >= ? AND position <= ?` : `position <= ?`} 
     AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
@@ -146,7 +150,8 @@ app.get('/counts/:user', async (req, res) => {
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
     SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
-    FROM osustats.${scores_table} INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id
+    FROM osustats.${scores_table}
+    ${req.query.country ? `INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id` : ""}
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
     WHERE osustats.${scores_table}.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
 
@@ -206,23 +211,35 @@ function getFilters(query, _params, b = false, scores_table) {
     let filter = ""
     let params = _params
     if (query.from) {
-        filter += ` AND osu.beatmap.approved_date >= ?`;
-        params.push(new Date(query.from).toISOString().slice(0, 19).replace('T', ' '));
+        let date = new Date(query.from)
+        if (isValidDate(date)) {
+            filter += ` AND osu.beatmap.approved_date >= ?`;
+            params.push(date.toISOString().slice(0, 19).replace('T', ' '));
+        }
     }
 
     if (query.to) {
-        filter += ` AND osu.beatmap.approved_date < ?`;
-        params.push(new Date(query.to).toISOString().slice(0, 19).replace('T', ' '));
+        let date = new Date(query.to)
+        if (isValidDate(date)) {
+            filter += ` AND osu.beatmap.approved_date < ?`;
+            params.push(date.toISOString().slice(0, 19).replace('T', ' '));
+        }
     }
 
     if (query.played_from && !b) {
-        filter += ` AND osustats.${scores_table}.date >= ?`
-        params.push(new Date(query.played_from).toISOString().slice(0, 19).replace('T', ' '));
+        let date = new Date(query.played_from)
+        if (isValidDate(date)) {
+            filter += ` AND osustats.${scores_table}.date >= ?`
+            params.push(date.toISOString().slice(0, 19).replace('T', ' '));
+        }
     }
 
     if (query.played_to && !b) {
-        filter += ` AND osustats.${scores_table}.date < ?`
-        params.push(new Date(query.played_to).toISOString().slice(0, 19).replace('T', ' '));
+        let date = new Date(query.played_to)
+        if (isValidDate(date)) {
+            filter += ` AND osustats.${scores_table}.date < ?`
+            params.push(date.toISOString().slice(0, 19).replace('T', ' '));
+        }
     }
 
     if (query.length_min) {
