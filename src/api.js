@@ -11,7 +11,7 @@ import { getModsEnum } from './mods.js'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TYPES = ["top50s", "top25s", "top15s", "top8s", "top1s"]
+const TYPES = ["top50s", "top25s", "top15s", "top8s", "top1s", "custom"]
 const MODES = ["osu", "taiko", "catch", "mania"]
 const MODE_NUMBER = {
     "osu": 0,
@@ -28,10 +28,23 @@ app.use(logger("dev"))
 app.use(statusMonitor());
 
 app.get("/rankings/:type?", async (req, res) => {
-    const type = req.params.type && TYPES.includes(req.params.type) ? req.params.type : "top50s"
+    let type = req.params.type && TYPES.includes(req.params.type) ? req.params.type : "top50s"
     let limit = (parseInt(req.query.limit) <= 100 && parseInt(req.query.limit) > 0) ? req.query.limit : 50
     let offset = req.query.offset ?? 0
-    const pos = parseInt(type.replace(/\D/g, ""))
+    let pos = 50
+    if (type == "custom" && req.query.rank) {
+        pos = req.query.rank.split("-")
+        if (!pos[1]) {
+            pos[1] = pos[0]
+        }
+        if (!+pos[0] || !+pos[1]) {
+            type = "top50s"
+            pos = 50
+        }
+    }
+    else {
+        pos = parseInt(type.replace(/\D/g, ""))
+    }
 
     let mode
     if (+req.query.mode) {
@@ -58,18 +71,25 @@ app.get("/rankings/:type?", async (req, res) => {
     COUNT(score_id) as ? FROM osustats.${scores_table} 
     INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id 
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
-    WHERE position <= ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
+    WHERE ${type == "custom" && +pos[0] ? `position >= ? AND position <= ?` : `position <= ?`} 
+    AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
 
     const beatmap_query = `SELECT COUNT(distinct beatmap_id) as beatmaps_amount FROM osu.beatmap WHERE mode in (0,${MODE_NUMBER[mode]}) AND approved>0 AND approved!=3`
     const beatmap_filters = getFilters(req.query, [], true)
 
-    let { filter, params, filtered } = getFilters(req.query, [type, pos], false, scores_table)
+    let param_array
+    if (Array.isArray(pos)) {
+        param_array = [type, pos[0], pos[1]]
+    } else {
+        param_array = [type, pos]
+    }
+    let { filter, params, filtered } = getFilters(req.query, param_array, false, scores_table)
 
     filter += ` GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
     params.push(parseInt(limit), parseInt(offset))
 
     let rankings
-    if (filtered) {
+    if (filtered || type == "custom") {
         rankings = await getRankingsSQL(type, `${query} ${filter}`, params, offset, {
             query: `${beatmap_query} ${beatmap_filters.filter}`,
             params: beatmap_filters.params
