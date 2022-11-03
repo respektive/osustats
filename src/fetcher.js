@@ -103,11 +103,11 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                     }
                 }
 
-                if (scoresToInsert.length >= 5000 || idx + 1 == beatmapIds.length) {
+                if (scoresToInsert.length >= 10000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
                     const cleared = await conn.query(`DELETE FROM scores${modeString} WHERE beatmap_id IN (?)`, [beatmapsToClear])
-                    console.log(cleared, beatmapsToClear)
+                    console.log(cleared)
                     const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
                     console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
                     scoresToInsert = []
