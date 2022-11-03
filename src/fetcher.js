@@ -57,64 +57,78 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
 
     let scoresToInsert = []
     let beatmapsToClear = []
+    let beatmapsToFetch = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToClear.push(beatmap_id)
+        beatmapsToFetch.push(beatmap_id)
 
         let conn
-        try {
-            const response = await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${beatmap_id}&m=${mode}&limit=50`)
-            const beatmapScores = await response.json()
-            for (const [index, score] of beatmapScores.entries()) {
-                const position = index + 1
-                const mods = getMods(score.enabled_mods)
+        if (beatmapsToFetch.length >= 4 || idx + 1 == beatmapIds.length) {
+            try {
+                const reqs = beatmapsToFetch.map(async id => {
+                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=50`)
+                })
+                const results = await Promise.all(reqs)
+                beatmapsToFetch = []
+                for (const response of results) {
 
-                scoresToInsert.push([
-                    beatmap_id,
-                    score.score_id,
-                    score.score,
-                    score.username,
-                    score.maxcombo,
-                    score.count50,
-                    score.count100,
-                    score.count300,
-                    score.countmiss,
-                    score.countkatu,
-                    score.countgeki,
-                    score.perfect,
-                    score.enabled_mods,
-                    score.date,
-                    score.pp,
-                    score.rank,
-                    score.replay_available,
-                    position,
-                    score.user_id,
-                    mods.join()
-                ])
-            }
+                    const beatmapScores = await response.json()
+                    for (const [index, score] of beatmapScores.entries()) {
+                        const position = index + 1
+                        const mods = getMods(score.enabled_mods)
 
-            if (scoresToInsert.length >= 1000 || idx + 1 == beatmapIds.length) {
-                conn = await pool.getConnection()
+                        scoresToInsert.push([
+                            beatmap_id,
+                            score.score_id,
+                            score.score,
+                            score.username,
+                            score.maxcombo,
+                            score.count50,
+                            score.count100,
+                            score.count300,
+                            score.countmiss,
+                            score.countkatu,
+                            score.countgeki,
+                            score.perfect,
+                            score.enabled_mods,
+                            score.date,
+                            score.pp,
+                            score.rank,
+                            score.replay_available,
+                            position,
+                            score.user_id,
+                            mods.join()
+                        ])
+                    }
+                }
 
-                await conn.query(`DELETE FROM scores${modeString} WHERE beatmap_id IN (?)`, [beatmapsToClear])
-                const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, scoresToInsert)
-                console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                if (scoresToInsert.length >= 5000 || idx + 1 == beatmapIds.length) {
+                    conn = await pool.getConnection()
+
+                    const cleared = await conn.query(`DELETE FROM scores${modeString} WHERE beatmap_id IN (?)`, [beatmapsToClear])
+                    console.log(cleared, beatmapsToClear)
+                    const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
+                    console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                    scoresToInsert = []
+                    beatmapsToClear = []
+                    beatmapsToFetch = []
+                }
+            } catch (e) {
+                console.error(e)
+                console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
                 scoresToInsert = []
                 beatmapsToClear = []
+
+                continue
+            } finally {
+                if (conn) conn.release()
             }
-        } catch (e) {
-            console.error(e)
-            console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
-            scoresToInsert = []
-            beatmapsToClear = []
-            continue
-        } finally {
-            if (conn) conn.release()
         }
     }
 
     console.log(mode, "done.")
-    await insertIntoRedis(false, modeString)
+    //await insertIntoRedis(false, modeString)
     return
 }
 
