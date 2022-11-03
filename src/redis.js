@@ -83,7 +83,7 @@ async function insertIntoRedis(clear = false, mode = "") {
             console.log(mode, type + ":", "done inserting into redis.")
         }
 
-        console.log("done updating.")
+        console.log(mode, "done updating.")
         return 0
     } catch (e) {
         console.error(e)

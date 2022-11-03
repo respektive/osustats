@@ -56,11 +56,9 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
     }
 
     let scoresToInsert = []
-    let beatmapsToClear = []
     let beatmapsToFetch = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
-        beatmapsToClear.push(beatmap_id)
         beatmapsToFetch.push(beatmap_id)
 
         let conn
@@ -70,8 +68,8 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                     return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=50`)
                 })
                 const results = await Promise.all(reqs)
-                beatmapsToFetch = []
-                for (const response of results) {
+
+                for (const [idx, response] of results.entries()) {
 
                     const beatmapScores = await response.json()
                     for (const [index, score] of beatmapScores.entries()) {
@@ -79,7 +77,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                         const mods = getMods(score.enabled_mods)
 
                         scoresToInsert.push([
-                            beatmap_id,
+                            beatmapsToFetch[idx],
                             score.score_id,
                             score.score,
                             score.username,
@@ -102,23 +100,19 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                         ])
                     }
                 }
-
+                beatmapsToFetch = []
                 if (scoresToInsert.length >= 10000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
-                    const cleared = await conn.query(`DELETE FROM scores${modeString} WHERE beatmap_id IN (?)`, [beatmapsToClear])
-                    console.log(cleared)
-                    const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
-                    console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores for beatmap_ids", beatmapsToClear)
+                    const res = await conn.batch(`INSERT INTO tmp_scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
+                    console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores")
                     scoresToInsert = []
-                    beatmapsToClear = []
                     beatmapsToFetch = []
                 }
             } catch (e) {
                 console.error(e)
                 console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
                 scoresToInsert = []
-                beatmapsToClear = []
 
                 continue
             } finally {
@@ -126,9 +120,27 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
             }
         }
     }
+    if (skip == 0) {
+        let conn
+        try {
+            conn = await pool.getConnection()
+
+            const del = await conn.query(`TRUNCATE scores${modeString}`)
+            console.log(mode, del)
+            const res = await conn.query(`INSERT INTO scores${modeString} SELECT * FROM tmp_scores${modeString}`)
+            console.log(mode, res)
+            const del2 = await conn.query(`TRUNCATE tmp_scores${modeString}`)
+            console.log(mode, del2)
+        } catch (e) {
+            console.error(e)
+            console.log(mode, "Insert into scores table failed.")
+        } finally {
+            if (conn) conn.release()
+        }
+    }
 
     console.log(mode, "done.")
-    //await insertIntoRedis(false, modeString)
+    await insertIntoRedis(false, modeString)
     return
 }
 
