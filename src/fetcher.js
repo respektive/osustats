@@ -129,7 +129,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
             }
         }
     }
-    if (skip == 0) {
+    if (!fix && skip == 0) {
         let conn
         try {
             conn = await pool.getConnection()
