@@ -165,7 +165,9 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     }
 
     console.log(mode, "done.")
-    await insertIntoRedis(false, modeString)
+    if (!fix) {
+        await insertIntoRedis(false, modeString)
+    }
     return
 }
 
