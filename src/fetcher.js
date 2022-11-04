@@ -101,7 +101,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                     }
                 }
                 beatmapsToFetch = []
-                if (scoresToInsert.length >= 10000 || idx + 1 == beatmapIds.length) {
+                if (scoresToInsert.length >= 20000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
                     const res = await conn.batch(`INSERT INTO tmp_scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
@@ -125,11 +125,11 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
         try {
             conn = await pool.getConnection()
 
-            const del = await conn.query(`TRUNCATE scores${modeString}`)
+            const del = await conn.query(`DROP TABLE scores${modeString}`)
             console.log(mode, del)
-            const res = await conn.query(`INSERT INTO scores${modeString} SELECT * FROM tmp_scores${modeString}`)
+            const res = await conn.query(`RENAME TABLE  tmp_scores${modeString} TO scores${modeString}`)
             console.log(mode, res)
-            const del2 = await conn.query(`TRUNCATE tmp_scores${modeString}`)
+            const del2 = await conn.query(`CREATE TABLE tmp_scores${modeString} LIKE scores${modeString}`)
             console.log(mode, del2)
         } catch (e) {
             console.error(e)
