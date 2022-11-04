@@ -247,4 +247,17 @@ async function getUserId(username) {
     }
 }
 
-export { insertIntoRedis, runSQL, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate, getUserId }
+async function checkUserId(user_id) {
+    try {
+        const username = await redis.hget(user_id, "username")
+        if (username) {
+            return user_id
+        } else {
+            return false
+        }
+    } catch (e) {
+        return { "error": e.message }
+    }
+}
+
+export { insertIntoRedis, runSQL, getRankings, getRankingsSQL, getCounts, getCountsSQL, getLastUpdate, getUserId, checkUserId }

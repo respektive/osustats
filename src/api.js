@@ -3,7 +3,7 @@ dotenv.config()
 import express from "express"
 import logger from "morgan"
 import statusMonitor from "express-status-monitor"
-import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL, getUserId } from "./redis.js"
+import { getRankings, getCounts, getLastUpdate, getCountsSQL, getRankingsSQL, runSQL, getUserId, checkUserId } from "./redis.js"
 import path from "path"
 import { fileURLToPath } from "url";
 import { getModsEnum } from './mods.js'
@@ -114,7 +114,7 @@ app.get("/rankings/:type?", async (req, res) => {
 app.get('/counts/:user', async (req, res) => {
     let user_id
     if (+req.params.user) {
-        user_id = parseInt(req.params.user)
+        user_id = await checkUserId(parseInt(req.params.user))
     } else {
         user_id = await getUserId(req.params.user)
     }
