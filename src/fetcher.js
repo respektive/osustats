@@ -152,7 +152,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
         try {
             conn = await pool.getConnection()
 
-            const ins = await conn.query(`INSERT INTO scores${modeString} SELECET * FROM tmp_scores${modeString}`)
+            const ins = await conn.query(`INSERT INTO scores${modeString} SELECT * FROM tmp_scores${modeString}`)
             console.log(mode, ins)
             const del = await conn.query(`DELETE FROM tmp_scores${modeString}`)
             console.log(mode, del)
