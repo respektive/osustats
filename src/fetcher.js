@@ -61,7 +61,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
         const rows = await connec.query(`select beatmap_id from osu.beatmap where mode=${mode} and approved > 0 and approved != 3 and beatmap_id not in (select distinct beatmap_id from scores${modeString})`)
         beatmapIds = rows.map(row => row.beatmap_id)
         console.log(mode, "fixing", beatmapIds.length, "missing maps")
-        connec.release()
+        if (connec) connec.release()
     }
 
     let bidx
@@ -140,6 +140,22 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
             console.log(mode, res)
             const del2 = await conn.query(`CREATE TABLE tmp_scores${modeString} LIKE scores${modeString}`)
             console.log(mode, del2)
+        } catch (e) {
+            console.error(e)
+            console.log(mode, "Insert into scores table failed.")
+        } finally {
+            if (conn) conn.release()
+        }
+    }
+    if (fix) {
+        let conn
+        try {
+            conn = await pool.getConnection()
+
+            const ins = await conn.query(`INSERT INTO scores${modeString} SELECET * FROM tmp_scores${modeString}`)
+            console.log(mode, ins)
+            const del = await conn.query(`DELETE FROM tmp_scores${modeString}`)
+            console.log(mode, del)
         } catch (e) {
             console.error(e)
             console.log(mode, "Insert into scores table failed.")
