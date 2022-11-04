@@ -3,7 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
-import fetch from 'node-fetch'
+import fetch from 'node-fetch-retry'
 import { insertIntoRedis } from "./redis.js"
 import { getMods } from "./mods.js"
 
@@ -55,6 +55,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
         beatmapIds = beatmapIds.slice(skip)
     }
 
+    let bidx
     let scoresToInsert = []
     let beatmapsToFetch = []
 
@@ -65,19 +66,19 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
         if (beatmapsToFetch.length >= 4 || idx + 1 == beatmapIds.length) {
             try {
                 const reqs = beatmapsToFetch.map(async id => {
-                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=50`)
+                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=50`, { method: 'GET', retry: 3, pause: 1000 })
                 })
                 const results = await Promise.all(reqs)
 
-                for (const [idx, response] of results.entries()) {
-
+                for (const [ndx, response] of results.entries()) {
+                    bidx = ndx
                     const beatmapScores = await response.json()
                     for (const [index, score] of beatmapScores.entries()) {
                         const position = index + 1
                         const mods = getMods(score.enabled_mods)
 
                         scoresToInsert.push([
-                            beatmapsToFetch[idx],
+                            beatmapsToFetch[ndx],
                             score.score_id,
                             score.score,
                             score.username,
@@ -111,8 +112,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
                 }
             } catch (e) {
                 console.error(e)
-                console.log(mode, beatmap_id, "Couldn't fetch scores, continuing with next beatmap.")
-                scoresToInsert = []
+                console.log(mode, beatmapsToFetch[bidx], "Couldn't fetch scores, continuing with next beatmap.")
 
                 continue
             } finally {

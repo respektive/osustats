@@ -3,7 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
-import fetch from 'node-fetch';
+import fetch from 'node-fetch-retry';
 
 const pool = mariadb.createPool({
     host: process.env.DB_HOST,
@@ -58,7 +58,7 @@ async function insertIntoRedis(clear = false, mode = "") {
                     if (!country) {
                         let user
                         try {
-                            const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`)
+                            const res = await fetch(`https://osu.ppy.sh/api/get_user?k=${process.env.OSU_API_KEY}&u=${row.user_id}&type=id`, { method: 'GET', retry: 3, pause: 1000 })
                             const json = await res.json()
                             user = json[0]
                         } catch (e) {
