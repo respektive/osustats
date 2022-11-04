@@ -12,7 +12,7 @@ const pool = mariadb.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_DATABASE,
-    connectionLimit: 10
+    connectionLimit: 100
 })
 
 async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
@@ -56,11 +56,11 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     }
 
     if (fix) {
-        console.log(mode, "fixing missing maps")
         let connec
         connec = await pool.getConnection()
         const rows = await connec.query(`select beatmap_id from osu.beatmap where mode=${mode} and approved > 0 and approved != 3 and beatmap_id not in (select distinct beatmap_id from scores${modeString})`)
         beatmapIds = rows.map(row => row.beatmap_id)
+        console.log(mode, "fixing", beatmapIds.length, "missing maps")
         connec.release()
     }
 
