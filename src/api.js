@@ -132,7 +132,7 @@ app.get('/counts/:user', async (req, res) => {
     if (mode != "osu" && MODES.includes(mode)) {
         scores_table = `scores_${mode}`
     }
-    console.log(user_id)
+
     if (!user_id) {
         res.status(404)
         res.json({ "error": "user not found" })
