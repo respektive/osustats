@@ -253,7 +253,7 @@ async function checkUserId(user_id) {
         if (username) {
             return user_id
         } else {
-            return false
+            return null
         }
     } catch (e) {
         return { "error": e.message }
