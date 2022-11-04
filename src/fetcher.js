@@ -15,7 +15,7 @@ const pool = mariadb.createPool({
     connectionLimit: 10
 })
 
-async function fetchLeaderboardsV1(skip = 0, mode = 0) {
+async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     console.log(mode, "Starting Leaderboard fetching now.")
 
     const res = await fetch("https://osu.respektive.pw/beatmaps")
@@ -53,6 +53,15 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0) {
 
     if (skip > 0) {
         beatmapIds = beatmapIds.slice(skip)
+    }
+
+    if (fix) {
+        console.log(mode, "fixing missing maps")
+        let connec
+        connec = await pool.getConnection()
+        const rows = await connec.query(`select beatmap_id from osu.beatmap where mode=${mode} and approved > 0 and approved != 3 and beatmap_id not in (select distinct beatmap_id from scores${modeString})`)
+        beatmapIds = rows.map(row => row.beatmap_id)
+        connec.release()
     }
 
     let bidx
