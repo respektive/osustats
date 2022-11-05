@@ -29,7 +29,9 @@ const app = express()
 const port = process.env.PORT
 
 app.use(express.static(path.join(__dirname, "frontend", "build")))
-app.use(logger("dev"))
+app.use(logger("dev", {
+    skip: function (req, res) { return req.method == "OPTIONS" }
+}))
 app.use(statusMonitor());
 app.use(cors())
 
