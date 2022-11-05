@@ -67,9 +67,11 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     let bidx
     let scoresToInsert = []
     let beatmapsToFetch = []
+    let beatmapsToUpdate = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToFetch.push(beatmap_id)
+        beatmapsToUpdate.push(beatmap_id)
 
         let conn
         if (beatmapsToFetch.length >= 4 || idx + 1 == beatmapIds.length) {
@@ -116,8 +118,16 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
 
                     const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
                     console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores")
+                    const upd = await conn.query(`UPDATE scores${modeString} s
+                    INNER JOIN (
+                        SELECT score_id, ROW_NUMBER() OVER (PARTITION BY beatmap_id ORDER BY score DESC, score_id) pos
+                        FROM scores${modeString} WHERE beatmap_id IN (?)
+                    ) r ON r.score_id = s.score_id
+                    SET s.position = r.pos`, [beatmapsToUpdate])
+                    console.log(`Updated positions for`, upd.affectedRows, "scores")
                     scoresToInsert = []
                     beatmapsToFetch = []
+                    beatmapsToUpdate = []
                 }
             } catch (e) {
                 console.error(e)
