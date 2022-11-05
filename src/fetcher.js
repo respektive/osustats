@@ -114,7 +114,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                 if (scoresToInsert.length >= 20000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
-                    const res = await conn.batch(`INSERT INTO tmp_scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
+                    const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
                     console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores")
                     scoresToInsert = []
                     beatmapsToFetch = []
@@ -127,40 +127,6 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
             } finally {
                 if (conn) conn.release()
             }
-        }
-    }
-    if (!fix && skip == 0) {
-        let conn
-        try {
-            conn = await pool.getConnection()
-
-            const del = await conn.query(`DROP TABLE scores${modeString}`)
-            console.log(mode, del)
-            const res = await conn.query(`RENAME TABLE  tmp_scores${modeString} TO scores${modeString}`)
-            console.log(mode, res)
-            const del2 = await conn.query(`CREATE TABLE tmp_scores${modeString} LIKE scores${modeString}`)
-            console.log(mode, del2)
-        } catch (e) {
-            console.error(e)
-            console.log(mode, "Insert into scores table failed.")
-        } finally {
-            if (conn) conn.release()
-        }
-    }
-    if (fix) {
-        let conn
-        try {
-            conn = await pool.getConnection()
-
-            const ins = await conn.query(`INSERT INTO scores${modeString} SELECT * FROM tmp_scores${modeString}`)
-            console.log(mode, ins)
-            const del = await conn.query(`DELETE FROM tmp_scores${modeString}`)
-            console.log(mode, del)
-        } catch (e) {
-            console.error(e)
-            console.log(mode, "Insert into scores table failed.")
-        } finally {
-            if (conn) conn.release()
         }
     }
 

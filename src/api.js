@@ -73,9 +73,9 @@ app.get("/rankings/:type?", async (req, res) => {
         offset = (req.query.page - 1) * limit;
     }
 
-    const query = `SELECT ${scores_table}.user_id,
+    const query = `SELECT scores.user_id, ${type} FROM (
+    SELECT ${scores_table}.user_id,
     COUNT(score_id) as ? FROM osustats.${scores_table} 
-    ${req.query.country ? `INNER JOIN osustats.user_countries ON osustats.${scores_table}.user_id = osustats.user_countries.user_id` : ""} 
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
     WHERE ${type == "custom" && +pos[0] ? `position >= ? AND position <= ?` : `position <= ?`} 
     AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;
@@ -91,7 +91,15 @@ app.get("/rankings/:type?", async (req, res) => {
     }
     let { filter, params, filtered } = getFilters(req.query, param_array, false, scores_table)
 
-    filter += ` GROUP BY user_id ORDER BY ${type} DESC LIMIT ? OFFSET ?`
+    filter += ` GROUP BY user_id
+    ) as scores
+    ${req.query.country ? `LEFT JOIN osustats.user_countries ON scores.user_id = osustats.user_countries.user_id WHERE country LIKE ?` : ""} 
+    ORDER BY ${type} DESC LIMIT ? OFFSET ?`
+
+    if (req.query.country) {
+        params.push(req.query.country)
+        filtered = true
+    }
     params.push(parseInt(limit), parseInt(offset))
 
     let rankings
@@ -308,11 +316,6 @@ function getFilters(query, _params, b = false, scores_table) {
             filter += ` AND osustats.${scores_table}.mods NOT LIKE ?`;
             params.push(`%${mod}%`);
         }
-    }
-
-    if (query.country && !b) {
-        filter += ` AND osustats.user_countries.country = ?`;
-        params.push(query.country);
     }
 
     if (filter.length > 0)
