@@ -12,7 +12,7 @@ import { getModsEnum } from './mods.js'
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const TYPES = ["top50s", "top25s", "top15s", "top8s", "top1s", "custom"]
+const TYPES = ["top100s", "top50s", "top25s", "top15s", "top8s", "top1s", "custom"]
 const MODES = ["osu", "taiko", "catch", "mania"]
 const MODE_NUMBER = {
     "osu": 0,
@@ -161,7 +161,8 @@ app.get('/counts/:user', async (req, res) => {
     SUM(CASE WHEN position<=8 THEN 1 ELSE 0 END) as top8s,
     SUM(CASE WHEN position<=15 THEN 1 ELSE 0 END) as top15s,
     SUM(CASE WHEN position<=25 THEN 1 ELSE 0 END) as top25s,
-    SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s
+    SUM(CASE WHEN position<=50 THEN 1 ELSE 0 END) as top50s,
+    SUM(CASE WHEN position<=100 THEN 1 ELSE 0 END) as top100s
     FROM osustats.${scores_table}
     INNER JOIN osu.beatmap ON osustats.${scores_table}.beatmap_id = osu.beatmap.beatmap_id
     WHERE osustats.${scores_table}.user_id = ? AND osu.beatmap.approved > 0 AND osu.beatmap.approved != 3 AND osu.beatmap.mode in (0,${MODE_NUMBER[mode]})`;

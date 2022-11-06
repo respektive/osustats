@@ -13,7 +13,7 @@ const pool = mariadb.createPool({
     connectionLimit: 100
 })
 
-const COUNTS = [1, 8, 15, 25, 50]
+const COUNTS = [1, 8, 15, 25, 50, 100]
 
 async function insertIntoRedis(clear = false, mode = "") {
     let conn
@@ -54,6 +54,9 @@ async function insertIntoRedis(clear = false, mode = "") {
             let counter = 0
             for (const row of rows) {
                 try {
+                    if (!row.username) {
+                        continue
+                    }
                     const country = await redis.hget(row.user_id, "country")
                     if (!country) {
                         let user

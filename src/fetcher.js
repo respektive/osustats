@@ -77,7 +77,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
         if (beatmapsToFetch.length >= 4 || idx + 1 == beatmapIds.length) {
             try {
                 const reqs = beatmapsToFetch.map(async id => {
-                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=50`, { method: 'GET', retry: 3, pause: 1000 })
+                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=100`, { method: 'GET', retry: 3, pause: 1000 })
                 })
                 const results = await Promise.all(reqs)
 
