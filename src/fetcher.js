@@ -124,7 +124,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                         FROM scores${modeString} WHERE beatmap_id IN (?)
                     ) r ON r.score_id = s.score_id
                     SET s.position = r.pos`, [beatmapsToUpdate])
-                    console.log(`Updated positions for`, upd.affectedRows, "scores")
+                    console.log(mode, `Updated positions for`, upd.affectedRows, "scores")
                     scoresToInsert = []
                     beatmapsToFetch = []
                     beatmapsToUpdate = []
