@@ -10,6 +10,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "@adobe/node-fetch-retry": "^2.2.0",
     "axios": "^1.1.2",
     "axios-retry": "^3.3.1",
     "cors": "^2.8.5",
@@ -20,7 +21,6 @@
     "mariadb": "^3.0.1",
     "morgan": "^1.10.0",
     "node-cron": "^3.0.2",
-    "node-fetch-retry": "^2.0.1",
     "socket.io-parser": ">=4.0.5"
   }
 }

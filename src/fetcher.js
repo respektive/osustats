@@ -3,7 +3,7 @@ dotenv.config()
 import * as mariadb from "mariadb"
 import Redis from "ioredis"
 const redis = new Redis();
-import fetch from 'node-fetch-retry'
+import fetch from '@adobe/node-fetch-retry'
 import { insertIntoRedis } from "./redis.js"
 import { getMods } from "./mods.js"
 
@@ -77,7 +77,17 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
         if (beatmapsToFetch.length >= 4 || idx + 1 == beatmapIds.length) {
             try {
                 const reqs = beatmapsToFetch.map(async id => {
-                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=100`, { method: 'GET', retry: 3, pause: 1000 })
+                    return await fetch(`https://osu.ppy.sh/api/get_scores?k=${process.env.OSU_API_KEY}&b=${id}&m=${mode}&limit=100`, {
+                        retryOptions: {
+                            retryMaxDuration: 300000,
+                            retryInitialDelay: 1000,
+                            retryOnHttpResponse: function (response) {
+                                if ((response.status >= 500) || response.status == 429) {
+                                    return true;
+                                }
+                            }
+                        }
+                    })
                 })
                 const results = await Promise.all(reqs)
 
