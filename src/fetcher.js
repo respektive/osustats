@@ -68,6 +68,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     let scoresToInsert = []
     let beatmapsToFetch = []
     let beatmapsToUpdate = []
+    let checkedScoreIds = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToFetch.push(beatmap_id)
@@ -120,6 +121,8 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                             score.user_id,
                             mods.join()
                         ])
+
+                        checkedScoreIds.push(score.score_id)
                     }
                 }
                 beatmapsToFetch = []
@@ -158,6 +161,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                     scoresToInsert = []
                     beatmapsToFetch = []
                     beatmapsToUpdate = []
+                    checkedScoreIds = []
                 }
             } catch (e) {
                 console.error(e)
