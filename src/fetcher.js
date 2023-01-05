@@ -68,6 +68,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     let scoresToInsert = []
     let beatmapsToFetch = []
     let beatmapsToUpdate = []
+    let checkedScoreIds = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToFetch.push(beatmap_id)
@@ -120,12 +121,21 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                             score.user_id,
                             mods.join()
                         ])
+
+                        checkedScoreIds.push(score.score_id)
                     }
                 }
                 beatmapsToFetch = []
                 if (scoresToInsert.length >= 20000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
+                    // Insert checked score_ids
+                    const trunc = await conn.query(`TRUNCATE checked_score_ids${modeString}`)
+                    console.log(mode, "truncated ", trunc.affectedRows, ` rows from checked_score_ids${modeString}`)
+                    const ins = await conn.batch(`INSERT INTO checked_score_ids${modeString} VALUES (?) ON DUPLICATE KEY UPDATE score_id = score_id`, checkedScoreIds)
+                    console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", ins.affectedRows, "score_ids")
+
+                    // Insert scores
                     const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
                     console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores")
                     const upd = await conn.query(`UPDATE scores${modeString} s
@@ -138,6 +148,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                     scoresToInsert = []
                     beatmapsToFetch = []
                     beatmapsToUpdate = []
+                    checkedScoreIds = []
                 }
             } catch (e) {
                 console.error(e)
