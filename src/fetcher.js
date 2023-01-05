@@ -68,7 +68,6 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
     let scoresToInsert = []
     let beatmapsToFetch = []
     let beatmapsToUpdate = []
-    let checkedScoreIds = []
 
     for (const [idx, beatmap_id] of beatmapIds.entries()) {
         beatmapsToFetch.push(beatmap_id)
@@ -121,23 +120,17 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                             score.user_id,
                             mods.join()
                         ])
-
-                        checkedScoreIds.push(score.score_id)
                     }
                 }
                 beatmapsToFetch = []
-                if (scoresToInsert.length >= 20000 || idx + 1 == beatmapIds.length) {
+                if (scoresToInsert.length >= 2000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
-
-                    // Insert checked score_ids
-                    const trunc = await conn.query(`TRUNCATE checked_score_ids${modeString}`)
-                    console.log(mode, "truncated ", trunc.affectedRows, ` rows from checked_score_ids${modeString}`)
-                    const ins = await conn.batch(`INSERT INTO checked_score_ids${modeString} VALUES (?) ON DUPLICATE KEY UPDATE score_id = score_id`, checkedScoreIds)
-                    console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", ins.affectedRows, "score_ids")
 
                     // Insert scores
                     const res = await conn.batch(`INSERT INTO scores${modeString} VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE score_id = score_id`, scoresToInsert)
                     console.log(mode, `(${idx + 1}/${beatmapIds.length})`, "added", res.affectedRows, "scores")
+
+                    // Update score positions
                     const upd = await conn.query(`UPDATE scores${modeString} s
                     INNER JOIN (
                         SELECT score_id, ROW_NUMBER() OVER (PARTITION BY beatmap_id ORDER BY score DESC, score_id) pos
@@ -145,10 +138,26 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                     ) r ON r.score_id = s.score_id
                     SET s.position = r.pos`, [beatmapsToUpdate])
                     console.log(mode, `Updated positions for`, upd.affectedRows, "scores")
+                    
+                    // Delete top100 scores that are not valid score_ids
+                    const del = await conn.query(`DELETE FROM scores${modeString} WHERE position <= 100 
+                    AND score_id NOT IN (?) AND beatmap_id IN (?)`, [checkedScoreIds, beatmapsToUpdate])
+                    console.log(mode, "Deleted", del.affectedRows, "scores" )
+
+                    // Only update positions again if any scores were actually deleted
+                    if (del.affectedRows > 0) {
+                        const upd2 = await conn.query(`UPDATE scores${modeString} s
+                        INNER JOIN (
+                            SELECT score_id, ROW_NUMBER() OVER (PARTITION BY beatmap_id ORDER BY score DESC, score_id) pos
+                            FROM scores${modeString} WHERE beatmap_id IN (?)
+                        ) r ON r.score_id = s.score_id
+                        SET s.position = r.pos`, [beatmapsToUpdate])
+                        console.log(mode, `Updated positions for`, upd2.affectedRows, "scores")
+                    }
+
                     scoresToInsert = []
                     beatmapsToFetch = []
                     beatmapsToUpdate = []
-                    checkedScoreIds = []
                 }
             } catch (e) {
                 console.error(e)
