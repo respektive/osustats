@@ -126,7 +126,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
                     }
                 }
                 beatmapsToFetch = []
-                if (scoresToInsert.length >= 2000 || idx + 1 == beatmapIds.length) {
+                if (scoresToInsert.length >= 20000 || idx + 1 == beatmapIds.length) {
                     conn = await pool.getConnection()
 
                     // Insert scores
