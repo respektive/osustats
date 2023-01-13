@@ -131,7 +131,7 @@ async function getRankings(_type = "top50s", limit = 50, offset = 0, mode) {
         const type = _type + _mode
         const ranking = await redis.zrevrange(type, offset, limit - 1, "WITHSCORES")
 
-        const leaderboard = []
+        let leaderboard = []
         for (let i = 0; i < ranking.length; i += 2) {
             let data = {}
             const [username, country] = await redis.hmget(ranking[i], ["username", "country"])
@@ -140,12 +140,18 @@ async function getRankings(_type = "top50s", limit = 50, offset = 0, mode) {
             data["username"] = username
             data["country"] = country
             data[_type] = parseInt(ranking[i + 1])
-            data["beatmaps_amount"] = parseInt(await redis.get(`beatmaps_amount${_mode}`))
 
             leaderboard.push(data)
         }
 
-        return leaderboard
+        const rankings = {
+            "beatmaps_amount": parseInt(await redis.get(`beatmaps_amount${_mode}`)),
+            "last_update": await redis.get("last_update"),
+            "users_amount": await redis.zcount(type, "-inf", "+inf"),
+            leaderboard,
+        }
+
+        return rankings
     } catch (e) {
         return { "error": e.message }
     }
@@ -158,11 +164,9 @@ async function getRankingsSQL(type, query, params, offset, beatmap) {
         const rows = await conn.query(query, params)
         const beatmap_rows = await conn.query(beatmap.query, beatmap.params)
 
-        const leaderboard = []
+        let leaderboard = []
         for (const [index, row] of rows.entries()) {
-            let data = {
-                "beatmaps_amount": parseInt(beatmap_rows[0]["beatmaps_amount"]),
-            }
+            let data = {}
             const [username, country] = await redis.hmget(row.user_id, ["username", "country"])
             data["rank"] = parseInt(offset) + (index + 1)
             data["user_id"] = parseInt(row.user_id)
@@ -172,6 +176,14 @@ async function getRankingsSQL(type, query, params, offset, beatmap) {
 
             leaderboard.push(data)
         }
+
+        const rankings = {
+            "beatmaps_amount": parseInt(beatmap_rows[0]["beatmaps_amount"]),
+            "last_update": await redis.get("last_update"),
+            leaderboard,
+        }
+
+        return rankings
 
         return leaderboard
     } catch (e) {
@@ -189,6 +201,7 @@ async function getCounts(user_id, mode) {
         }
         let data = {
             "beatmaps_amount": parseInt(await redis.get(`beatmaps_amount${_mode}`)),
+            "last_update": await redis.get("last_update"),
         }
         const [username, country] = await redis.hmget(user_id, ["username", "country"])
         if (!username)
@@ -220,6 +233,7 @@ async function getCountsSQL(query, params, custom_rank) {
             return { "error": "user not found" }
         let data = {
             "beatmaps_amount": parseInt(row["beatmaps_amount"]),
+            "last_update": await redis.get("last_update"),
         }
         data["user_id"] = parseInt(row.user_id)
         data["username"] = username
