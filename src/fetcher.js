@@ -182,7 +182,7 @@ async function fetchLeaderboardsV1(skip = 0, mode = 0, fix = false) {
 }
 
 async function setLastUpdate() {
-    await redis.set("last_update", new Date().toISOString())
+    await redis.set("last_update", new Date().toISOString().split('.')[0]+"Z")
     return
 }
 
