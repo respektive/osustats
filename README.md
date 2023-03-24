@@ -1,7 +1,7 @@
 # osustats
-API endpoints for osu! leaderboard position counts. https://osustats.respektive.pw/
+API endpoints for osu! leaderboard position counts. ~~https://osustats.respektive.pw/~~
 
-__Still very WIP__
+__I stopped running this, as it takes way to many API requests and I lost interest in it aswell.__
 
 ### Running your own
 
